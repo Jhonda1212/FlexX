@@ -15,6 +15,18 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
           "/app/profile": {
             title: "Mi perfil",
             subtitle: "Gestiona tu cuenta, seguridad y preferencias."
+          },
+          "/app/vip": {
+            title: "Salas VIP",
+            subtitle: "Reserva un ambiente privado para tu noche en FLEX."
+          },
+          "/app/my-turn": {
+            title: "Mi turno en vivo",
+            subtitle: "Apúntate para cantar, tocar o subir al escenario esta noche."
+          },
+          "/app/song-request": {
+            title: "Pide tu canción",
+            subtitle: "Envia tu tema al DJ y acompaña la noche con tu selección."
           }
         }}
         role="user"

@@ -3382,6 +3382,8 @@ Se mantuvo la estructura y la logica de la fase anterior, pero se refinaron las 
 - Se ajusto el espaciado del hero y de la grilla para que las cards respiren mejor.
 - Se igualo el peso visual de Sala Dorada con las demas cards: conserva badges premium, pero usa un glow mas sutil y una zona de badges con altura estable.
 - Se suavizo el hover de las cajas principales con menor desplazamiento, sombras mas limpias y movimiento de flecha mas discreto.
+- Se agrego jerarquia interna a cada card con una linea de ambiente por sala, detalles con acento propio y botones redondeados mas consistentes.
+- Se agrego titulo propio para `/app/vip` en el shell de cliente, evitando que la ruta use el encabezado generico de bienvenida.
 
 ### 2. Que no se toco
 
@@ -3391,6 +3393,7 @@ Se mantuvo la estructura y la logica de la fase anterior, pero se refinaron las 
 - No se tocaron migraciones, RLS, middleware, auth ni roles.
 - No se introdujeron mocks nuevos.
 - No se modificaron rutas fuera de `/app/vip`.
+- Solo se ajusto `app/app/layout.tsx` para definir el titulo especifico de `/app/vip`; no se cambiaron permisos, roles ni navegacion.
 
 ### 3. Como probar visualmente
 
@@ -3400,8 +3403,119 @@ Se mantuvo la estructura y la logica de la fase anterior, pero se refinaron las 
 4. Confirmar que Sala Dorada se percibe como la mas exclusiva.
 5. Pasar el cursor sobre las cards y verificar hover suave, glow y movimiento de flecha.
 6. Confirmar que los CTAs siguen navegando a la ruta actual de cada sala.
+7. Confirmar que el encabezado de desktop dice `Salas VIP` y no el texto generico de bienvenida.
 
 ### 4. Riesgos o pendientes
 
 - Los estilos dependen del nombre o `color_theme` de la sala para clasificar Negra, Roja o Dorada.
 - La accion de reserva aun navega al flujo existente de compartir/acceso; queda pendiente implementar reserva real si se define el flujo de pagos o booking.
+
+## Fase actual: rediseño visual de Mi turno en vivo
+
+### 1. Que se cambio en `/app/my-turn`
+
+- Se reemplazo la presentacion basica por una vista premium con hero propio `Mi turno en vivo`.
+- Se agrego el subtitulo `Apúntate para cantar, tocar o subir al escenario esta noche.`
+- Se evito el encabezado generico `Bienvenido a FLEX` en esta ruta mediante un titulo especifico en el shell de usuario.
+- El estado del turno ahora muestra `Sin turno activo` cuando el usuario aun no esta en cola.
+- Cuando hay posicion, la vista muestra posicion, espera estimada y estado en tarjetas claras con badges.
+- El formulario se encapsulo en una tarjeta premium con los campos `Nombre artístico`, `Tipo de participación` e `Instrumento opcional`.
+- El CTA principal queda como `Unirme a la lista`.
+- Se agrego una tarjeta lateral `Cómo funciona` con cuatro pasos cortos para dar contexto a la experiencia.
+- Se agregaron hovers y transiciones suaves en tarjetas, campos y elementos visuales.
+
+### 2. Que no se toco
+
+- No se modifico `joinLiveQueue()`.
+- No se cambio la conexion real con Supabase.
+- No se cambiaron validaciones funcionales existentes.
+- No se tocaron middleware, migraciones, RLS, roles ni rutas.
+- No se agregaron dependencias ni mocks.
+
+### 3. Como probar manualmente
+
+1. Iniciar sesion como usuario y abrir `/app/my-turn`.
+2. Confirmar que el encabezado de desktop dice `Mi turno en vivo` y no `Bienvenido a FLEX`.
+3. Confirmar que el estado inicial muestra `Sin turno activo`.
+4. Intentar enviar sin nombre artistico y validar que aparece el error existente.
+5. Seleccionar `Instrumento` sin completar el instrumento y validar que aparece el error existente.
+6. Completar el formulario y confirmar que se llama al flujo real de cola.
+7. Confirmar que al recibir posicion se muestran posicion, espera estimada y estado activo.
+8. Revisar desktop y movil para validar layout de dos columnas y una columna respectivamente.
+
+### 4. Riesgos o pendientes
+
+- La espera `20 - 30 min` sigue siendo el valor estimado que ya mostraba la pantalla anterior.
+- Queda pendiente conectar una estimacion dinamica si se define una regla de calculo desde la cola real.
+
+## Fase actual: simplificacion de Mi turno en vivo
+
+### 1. Que se cambio en `/app/my-turn`
+
+- Se redujo el hero superior a una franja compacta dentro del bloque principal.
+- El estado actual del turno paso a ser el primer bloque visible y la jerarquia principal de la pagina.
+- Se unio visualmente el estado con el formulario en una sola tarjeta, separada por columnas en desktop y por secciones en movil.
+- Se redujo la cantidad de tarjetas, bordes y badges para evitar competencia visual.
+- La guia rapida lateral se compacto en una sola tarjeta secundaria, sin cajas internas por cada paso.
+- Se mantuvo el estilo FLEX oscuro, dorado y rojo oscuro con bordes suaves.
+- Se mantuvo el responsive: panel principal + guia en desktop, una columna en movil.
+
+### 2. Que no se toco
+
+- No se modifico `joinLiveQueue()`.
+- No se cambiaron validaciones, estado local ni flujo de envio.
+- No se cambio la conexion real con Supabase.
+- No se tocaron middleware, migraciones, RLS, roles ni rutas.
+- No se agregaron mocks ni dependencias.
+
+### 3. Como probar manualmente
+
+1. Iniciar sesion como usuario y abrir `/app/my-turn`.
+2. Confirmar que el estado actual aparece como primer foco de lectura.
+3. Confirmar que el estado inicial muestra `Sin turno activo`.
+4. Enviar sin nombre artistico y validar que aparece el error existente.
+5. Seleccionar `Instrumento` sin completar instrumento y validar que aparece el error existente.
+6. Completar el formulario y confirmar que se mantiene el flujo real de cola.
+7. Confirmar que al recibir posicion se muestra el numero, espera estimada y estado.
+8. Revisar desktop y movil para confirmar que la pagina queda limpia y legible.
+
+### 4. Riesgos o pendientes
+
+- La espera `20 - 30 min` sigue siendo un valor fijo heredado de la vista anterior.
+- Queda pendiente una estimacion dinamica si se define una regla de calculo basada en la cola real.
+
+## Fase actual: mejora visual de pedir cancion
+
+### 1. Que se cambio en `/app/song-request`
+
+- Se reemplazo la vista basica por una composicion premium con tarjeta principal y columna secundaria.
+- Se agrego encabezado contextual para la ruta: `Pide tu canción`, evitando el encabezado generico `Bienvenido a FLEX`.
+- La tarjeta principal ahora presenta el formulario como accion central con mejor jerarquia, padding y espaciado.
+- Los campos se organizaron en una grilla responsive: cancion y artista en dos columnas cuando hay espacio, genero y dedicatoria debajo.
+- Se agrego estado visual del pedido: `Pendiente` antes de enviar y `Enviado` cuando la accion termina correctamente.
+- Se agrego un bloque lateral ligero con consejos rapidos para pedir canciones sin cargar la interfaz.
+- Se mantuvo la estetica FLEX: fondo oscuro, acento dorado, rojo oscuro sutil, bordes suaves y botones claros.
+
+### 2. Que no se toco
+
+- No se modifico `submitSongRequest()`.
+- No se cambiaron validaciones ni flujo de envio.
+- No se cambio la conexion real con Supabase.
+- No se tocaron middleware, roles, RLS, migraciones ni base de datos.
+- No se agregaron mocks ni dependencias.
+- No se cambiaron rutas existentes.
+
+### 3. Como probar manualmente
+
+1. Iniciar sesion como usuario y abrir `/app/song-request`.
+2. Confirmar que el header de desktop muestra `Pide tu canción` y no `Bienvenido a FLEX`.
+3. Confirmar que el formulario es el elemento principal de la pantalla.
+4. Enviar sin completar cancion, artista o genero y validar el error existente.
+5. Completar cancion, artista y genero, enviar y confirmar el feedback de exito.
+6. Confirmar que el estado visual cambia de `Pendiente` a `Enviado`.
+7. Revisar desktop y movil para validar que el layout pasa de dos columnas a una columna sin overflow.
+
+### 4. Riesgos o pendientes
+
+- El estado visual `Enviado` depende del feedback local existente tras enviar la solicitud.
+- Queda pendiente conectar estados reales como `approved`, `playing`, `played` o `rejected` si se implementa una vista de seguimiento por usuario.
