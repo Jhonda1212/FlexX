@@ -12,6 +12,7 @@ import {
   type MockTicket,
   validateMockTicket
 } from "./mock-store";
+import { featuredEvents } from "./featured-events";
 
 export function mocksEnabled() {
   return process.env.NEXT_PUBLIC_ENABLE_MOCKS === "true";
@@ -38,6 +39,27 @@ export type FlexEvent = {
   capacity: number;
   ticketPriceCents: number;
   dateLabel: string;
+  imageUrl: string | null;
+  artist: string | null;
+  artistUrl: string | null;
+  zone: string | null;
+  featured: boolean;
+};
+
+export type FeaturedEventView = {
+  id: string;
+  title: string;
+  artist: string | null;
+  description: string | null;
+  startsAt: string;
+  endsAt: string | null;
+  dateLabel: string;
+  zone: string | null;
+  imageUrl: string | null;
+  artistUrl: string | null;
+  externalUrl: string | null;
+  featured: boolean;
+  source: "supabase" | "local";
 };
 
 export type VipRoom = {
@@ -83,11 +105,99 @@ function mapTicketStatus(status: string): TicketView["status"] {
   return "cancelled";
 }
 
+function localEventDateIso(date: string) {
+  const [day, month] = date.split(" ");
+  const monthIndex = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"].indexOf(month);
+  const year = new Date().getFullYear();
+  return new Date(year, Math.max(monthIndex, 0), Number(day), 22).toISOString();
+}
+
+function localFeaturedEvents(): FeaturedEventView[] {
+  return featuredEvents.map((event) => ({
+    id: event.id,
+    title: event.title,
+    artist: event.artist,
+    description: event.description,
+    startsAt: localEventDateIso(event.date),
+    endsAt: null,
+    dateLabel: event.date,
+    zone: event.zone,
+    imageUrl: event.image,
+    artistUrl: event.artistUrl,
+    externalUrl: null,
+    featured: true,
+    source: "local" as const
+  }));
+}
+
+function mapFeaturedEvent(event: any): FeaturedEventView {
+  return {
+    id: event.id as string,
+    title: event.title as string,
+    artist: (event.artist_name as string | null) ?? null,
+    description: (event.description as string | null) ?? null,
+    startsAt: event.starts_at as string,
+    endsAt: (event.ends_at as string | null) ?? null,
+    dateLabel: formatDateLabel(event.starts_at as string),
+    zone: (event.zone_name as string | null) ?? "FLEX",
+    imageUrl: (event.image_url as string | null) ?? (event.cover_image_path as string | null) ?? null,
+    artistUrl: (event.artist_url as string | null) ?? null,
+    externalUrl: (event.external_url as string | null) ?? null,
+    featured: Boolean(event.featured),
+    source: "supabase"
+  };
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+export async function listFeaturedPublishedEvents(limit = 3): Promise<FeaturedEventView[]> {
+  const supabase = createBrowserSupabase();
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("events")
+    .select("id, title, description, starts_at, ends_at, cover_image_path, image_url, artist_name, artist_url, external_url, featured, zone_name")
+    .eq("is_published", true)
+    .gte("starts_at", now)
+    .order("featured", { ascending: false })
+    .order("starts_at", { ascending: true })
+    .limit(limit);
+
+  if (error) {
+    if (mocksEnabled()) return localFeaturedEvents().slice(0, limit);
+    throw error;
+  }
+
+  const events = (data ?? []).map(mapFeaturedEvent);
+  return events.length > 0 ? events : localFeaturedEvents().slice(0, limit);
+}
+
+export async function getPublishedEventDetail(eventId: string): Promise<FeaturedEventView | null> {
+  const local = localFeaturedEvents().find((event) => event.id === eventId);
+  if (!isUuid(eventId)) return local ?? null;
+
+  const supabase = createBrowserSupabase();
+  const { data, error } = await supabase
+    .from("events")
+    .select("id, title, description, starts_at, ends_at, cover_image_path, image_url, artist_name, artist_url, external_url, featured, zone_name")
+    .eq("id", eventId)
+    .eq("is_published", true)
+    .maybeSingle();
+
+  if (error) {
+    if (mocksEnabled()) return local ?? null;
+    throw error;
+  }
+
+  return data ? mapFeaturedEvent(data) : local ?? null;
+}
+
 export async function listPublishedEvents(): Promise<FlexEvent[]> {
   const supabase = createBrowserSupabase();
   const { data, error } = await supabase
     .from("events")
-    .select("id, title, description, starts_at, ends_at, capacity, ticket_price_cents")
+    .select("id, title, description, starts_at, ends_at, capacity, ticket_price_cents, cover_image_path, image_url, artist_name, artist_url, zone_name, featured")
     .eq("is_published", true)
     .order("starts_at", { ascending: true });
 
@@ -104,7 +214,12 @@ export async function listPublishedEvents(): Promise<FlexEvent[]> {
     endsAt: event.ends_at as string | null,
     capacity: event.capacity as number,
     ticketPriceCents: event.ticket_price_cents as number,
-    dateLabel: formatDateLabel(event.starts_at as string)
+    dateLabel: formatDateLabel(event.starts_at as string),
+    imageUrl: ((event.image_url as string | null) ?? (event.cover_image_path as string | null)) || null,
+    artist: (event.artist_name as string | null) ?? null,
+    artistUrl: (event.artist_url as string | null) ?? null,
+    zone: (event.zone_name as string | null) ?? null,
+    featured: Boolean(event.featured)
   }));
 }
 

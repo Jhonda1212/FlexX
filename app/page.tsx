@@ -7,7 +7,7 @@ export default function HomePage() {
   return (
     <main className="min-h-screen px-4 py-6 sm:px-8">
       <section className="relative flex min-h-[calc(100vh-3rem)] items-end overflow-hidden rounded-lg border border-[var(--gold)]/20 bg-black">
-        <div className="absolute inset-0 bg-[url('/images/jazz-night.png')] bg-cover bg-center opacity-58" />
+        <div className="absolute inset-0 bg-[url('/images/events/john-coltrane.jpg')] bg-cover bg-center opacity-58" />
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/72 to-black/18" />
         <div className="relative z-10 w-full p-6 sm:p-10 lg:p-14">
           <Logo />

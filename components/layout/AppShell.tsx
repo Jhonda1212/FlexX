@@ -11,6 +11,9 @@ import { createBrowserSupabase } from "@/lib/supabase";
 import { getNavForRole, type AppRole } from "@/lib/navigation/role-nav";
 import { FlexBadge } from "@/components/ui/FlexBadge";
 
+const iconButtonClass =
+  "gold-focus cursor-pointer rounded-md border border-white/10 bg-white/[0.02] p-3 text-white/82 transition-[background-color,border-color,box-shadow,color,transform] duration-200 ease-out hover:border-[var(--gold)]/45 hover:bg-[var(--gold)]/8 hover:text-white active:scale-[0.98]";
+
 export function AppShell({
   children,
   nav,
@@ -101,7 +104,7 @@ export function AppShell({
           <h1 className="font-display mt-3 text-4xl text-white">Rol no disponible</h1>
           <p className="mt-3 text-sm text-[var(--muted)]">{roleError || "No hay un rol activo en staff_profiles para esta sesion."}</p>
           <button
-            className="gold-focus mt-6 min-h-12 rounded-md bg-[var(--gold)] px-5 text-sm font-bold uppercase tracking-[0.08em] text-black"
+            className="gold-focus mt-6 min-h-12 cursor-pointer rounded-md bg-[var(--gold)] px-5 text-sm font-bold uppercase tracking-[0.08em] text-black transition-[background-color,box-shadow,transform] duration-200 ease-out hover:bg-[var(--gold-bright)] hover:shadow-[0_14px_34px_rgba(217,166,64,0.18)] active:scale-[0.99]"
             onClick={() => router.push("/app")}
           >
             Volver a app
@@ -123,12 +126,20 @@ export function AppShell({
               <Link
                 key={item.href}
                 href={item.href}
-                className={`gold-focus flex min-h-14 items-center gap-4 rounded-md px-4 text-sm font-semibold transition ${
-                  active ? "gold-surface text-white" : "text-white/82 hover:bg-white/[0.04]"
+                aria-current={active ? "page" : undefined}
+                className={`gold-focus group relative flex min-h-14 cursor-pointer items-center gap-4 rounded-md border px-4 text-sm font-semibold transition-[background-color,border-color,box-shadow,color,transform] duration-200 ease-out active:scale-[0.99] ${
+                  active
+                    ? "border-[var(--gold)]/35 bg-[linear-gradient(135deg,rgba(217,166,64,0.18),rgba(255,255,255,0.035))] text-white shadow-[0_12px_32px_rgba(0,0,0,0.22)]"
+                    : "border-transparent text-white/78 hover:border-[var(--gold)]/22 hover:bg-[var(--gold)]/8 hover:text-white"
                 }`}
               >
-                <Icon className={active ? "text-[var(--gold)]" : "text-white/80"} size={22} />
-                {item.label}
+                <span
+                  className={`absolute left-0 top-1/2 h-7 w-0.5 -translate-y-1/2 rounded-r-full bg-[var(--gold)] transition-opacity duration-200 ${
+                    active ? "opacity-100" : "opacity-0 group-hover:opacity-55"
+                  }`}
+                />
+                <Icon className={`transition-colors duration-200 ${active ? "text-[var(--gold)]" : "text-white/64 group-hover:text-[var(--gold)]"}`} size={22} />
+                <span className="transition-colors duration-200">{item.label}</span>
               </Link>
             );
           })}
@@ -144,7 +155,7 @@ export function AppShell({
         <header className="mb-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <button
-              className="gold-focus rounded-md border border-white/10 p-3 lg:hidden"
+              className={`${iconButtonClass} lg:hidden`}
               aria-label="Ir al inicio"
               onClick={() => router.push(safeNav[0]?.href ?? "/app")}
             >
@@ -160,13 +171,13 @@ export function AppShell({
           </div>
           <div className="flex items-center gap-3">
             <button
-              className="gold-focus rounded-md border border-white/10 p-3"
+              className={iconButtonClass}
               aria-label="Notificaciones"
               onClick={() => router.push(staff ? "/guard/alerts" : "/app/notifications")}
             >
               <Bell size={20} />
             </button>
-            <button className="gold-focus hidden rounded-md border border-white/10 p-3 sm:inline-flex" aria-label="Salir" onClick={signOut}>
+            <button className={`${iconButtonClass} hidden sm:inline-flex`} aria-label="Salir" onClick={signOut}>
               <LogOut size={20} />
             </button>
           </div>
@@ -183,12 +194,15 @@ export function AppShell({
               <Link
                 key={item.href}
                 href={item.href}
-                className={`gold-focus flex h-16 flex-col items-center justify-center gap-1 rounded-md text-[11px] font-bold ${
-                  active ? "text-[var(--gold)]" : "text-white/70"
+                aria-current={active ? "page" : undefined}
+                className={`gold-focus flex h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border text-[11px] font-bold transition-[background-color,border-color,color,transform] duration-200 ease-out active:scale-[0.98] ${
+                  active
+                    ? "border-[var(--gold)]/25 bg-[var(--gold)]/12 text-[var(--gold)]"
+                    : "border-transparent text-white/68 hover:border-[var(--gold)]/20 hover:bg-[var(--gold)]/8 hover:text-white"
                 }`}
               >
-                <Icon size={22} />
-                {item.label}
+                <Icon className="transition-colors duration-200" size={22} />
+                <span>{item.label}</span>
               </Link>
             );
           })}

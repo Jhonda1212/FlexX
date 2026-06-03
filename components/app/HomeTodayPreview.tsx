@@ -60,7 +60,7 @@ export function HomeTodayPreview() {
   }, []);
 
   return (
-    <FlexCard>
+    <FlexCard className={posts.length === 0 && !loading && !error ? "py-4" : ""}>
       <div className="mb-4 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Megaphone className="text-[var(--gold)]" size={20} />
@@ -80,9 +80,18 @@ export function HomeTodayPreview() {
       {error ? <p className="text-sm text-red-200">{error}</p> : null}
 
       {!loading && !error && posts.length === 0 ? (
-        <div className="rounded-md border border-white/10 bg-white/[0.03] p-4">
-          <p className="text-sm text-[var(--muted)]">Todavía no hay avisos oficiales para hoy.</p>
-          <Link href="/app/today"><FlexButton variant="ghost" className="mt-4 w-full sm:w-auto">Ver avisos</FlexButton></Link>
+        <div className="rounded-md border border-white/10 bg-white/[0.025] px-4 py-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-bold text-white">Hoy todavía está tranquilo</p>
+              <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
+                Cuando haya promociones, actividades o avisos aparecerán aquí.
+              </p>
+            </div>
+            <Link href="/app/today" className="shrink-0">
+              <FlexButton variant="ghost" className="w-full sm:w-auto">Ver avisos</FlexButton>
+            </Link>
+          </div>
         </div>
       ) : null}
 

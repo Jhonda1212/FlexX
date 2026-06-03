@@ -35,11 +35,7 @@ export const metrics: Metric[] = [
   { label: "VIP activas", value: "3/5", hint: "salas en uso" }
 ];
 
-export const upcomingEvents = [
-  { title: "Jazz Nights", date: "25 MAY", zone: "Pista principal", image: "/images/jazz-night.png" },
-  { title: "Soul & Blues", date: "31 MAY", zone: "Escenario live", image: "/images/club-stage.png" },
-  { title: "Latin Jazz", date: "07 JUN", zone: "Pista principal", image: "/images/vip-room.png" }
-];
+export { featuredEvents as upcomingEvents } from "./featured-events";
 
 export const recentAccess = [
   { name: "Maria Gonzalez", detail: "Entrada general", time: "23:47", ok: true },

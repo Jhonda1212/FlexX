@@ -17,7 +17,7 @@ export function FlexCard({
   tone?: keyof typeof tones;
 }) {
   return (
-    <section className={`${tones[tone]} rounded-lg p-5 transition-colors duration-200 ${className}`}>
+    <section className={`${tones[tone]} rounded-lg p-5 transition-[background-color,border-color,box-shadow,transform] duration-200 ease-out ${className}`}>
       {children}
     </section>
   );

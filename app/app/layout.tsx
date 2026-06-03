@@ -26,7 +26,7 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
           },
           "/app/song-request": {
             title: "Pide tu canción",
-            subtitle: "Envia tu tema al DJ y acompaña la noche con tu selección."
+            subtitle: "Envía el tema que quieres escuchar esta noche."
           }
         }}
         role="user"

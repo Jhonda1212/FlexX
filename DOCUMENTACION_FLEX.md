@@ -3519,3 +3519,363 @@ Se mantuvo la estructura y la logica de la fase anterior, pero se refinaron las 
 
 - El estado visual `Enviado` depende del feedback local existente tras enviar la solicitud.
 - Queda pendiente conectar estados reales como `approved`, `playing`, `played` o `rejected` si se implementa una vista de seguimiento por usuario.
+
+## Fase actual: refinamiento visual de pedir cancion
+
+### 1. Que se cambio en `/app/song-request`
+
+- Se ajusto el encabezado especifico de la ruta a `Pide tu cancion` con el subtitulo `Envia el tema que quieres escuchar esta noche.`.
+- La tarjeta principal se centro en el formulario `Solicitud musical` con el texto `Completa los datos para que el DJ revise tu pedido.`.
+- Se mantuvieron los campos actuales: cancion, artista, genero y dedicatoria opcional.
+- El boton principal cambio a `Enviar solicitud`.
+- Se agrego feedback claro para `Enviando...`, `Solicitud enviada` y `Error al enviar`.
+- Se agrego una tarjeta lateral `Como funciona` con cuatro pasos del flujo de revision del DJ.
+- Se agrego la mini card `Consejo FLEX` para recomendar escribir bien cancion y artista.
+- El layout queda en dos columnas en desktop y una columna en movil, manteniendo estilo oscuro, dorado y rojo vino sutil.
+
+### 2. Que no se toco
+
+- No se modifico `submitSongRequest()`.
+- No se cambio la conexion real con Supabase.
+- No se tocaron middleware, roles, RLS, migraciones ni base de datos.
+- No se agregaron mocks ni dependencias.
+- No se cambiaron rutas existentes.
+
+### 3. Como probar manualmente
+
+1. Iniciar sesion como usuario y abrir `/app/song-request`.
+2. Confirmar que el encabezado de desktop muestra `Pide tu cancion` y no `Bienvenido a FLEX`.
+3. Confirmar que el subtitulo muestra `Envia el tema que quieres escuchar esta noche.`.
+4. Confirmar que el formulario muestra `Solicitud musical` y conserva cancion, artista, genero y dedicatoria opcional.
+5. Enviar sin completar datos requeridos y confirmar el feedback `Error al enviar`.
+6. Completar cancion, artista y genero, enviar y confirmar `Enviando...` y luego `Solicitud enviada`.
+7. Revisar desktop y movil para validar dos columnas y una columna sin overflow.
+
+### 4. Riesgos o pendientes
+
+- La pantalla sigue sin mostrar seguimiento historico del estado real del pedido (`approved`, `playing`, `played` o `rejected`).
+- El genero sigue viajando por el flujo existente de `submitSongRequest()`; no se creo columna ni backend nuevo.
+
+## Fase actual: pulido visual de home cliente
+
+### 1. Que se cambio en `/app`
+
+- Se ajusto el espaciado general entre hero, accesos rapidos, Hoy en FLEX, columna derecha y proximos eventos.
+- El hero mantiene la imagen y el evento actual, pero usa padding mas respirado y un badge `Proxima Live Session` mas compacto.
+- Los accesos rapidos mantienen las cuatro cards existentes y actualizan sus textos:
+  - `Pedir cancion`: `Envia tu tema al DJ`.
+  - `Mi turno`: `Consulta tu posicion`.
+  - `Mis entradas`: `Muestra tu QR`.
+  - `Salas VIP`: `Reserva para tu grupo`.
+- Las cards de accesos rapidos ahora se perciben mas clicables con hover/focus suave, icono en superficie dorada y flecha con micro desplazamiento.
+- El empty state de `Hoy en FLEX` cambio a `Hoy todavia esta tranquilo` y `Cuando haya promociones, actividades o avisos apareceran aqui.`
+- El bloque vacio de Hoy en FLEX queda mas compacto y mantiene el CTA `Ver avisos`.
+- La columna derecha mantiene `Mi turno`, `Mis entradas` y `Reserva privada`, con spacing alineado al contenido principal.
+
+### 2. Que no se toco
+
+- No se cambio la logica del evento mostrado en el hero.
+- No se modifico la consulta real de `daily_feed_posts`.
+- No se tocaron middleware, auth, roles, RLS, migraciones ni base de datos.
+- No se agregaron mocks nuevos ni dependencias.
+- No se cambiaron rutas ni logica de negocio.
+
+### 3. Como probar manualmente
+
+1. Iniciar sesion como usuario y abrir `/app`.
+2. Confirmar que el hero conserva la imagen, evento, fecha, hora, zona y boton `Ver detalles`.
+3. Confirmar que el badge `Proxima Live Session` se ve mas compacto.
+4. Confirmar que los accesos rapidos muestran los cuatro textos nuevos y que toda la card es clicable.
+5. Confirmar que `Hoy en FLEX` muestra avisos reales si existen.
+6. Si no hay avisos, confirmar que aparece `Hoy todavia esta tranquilo` con el CTA `Ver avisos`.
+7. Revisar en movil que el orden sea hero, accesos rapidos, Hoy en FLEX, columna derecha y proximos eventos, sin overflow horizontal.
+
+### 4. Riesgos o pendientes
+
+- La home sigue usando datos demo para algunos bloques laterales y proximos eventos, segun el estado actual del proyecto.
+- Queda pendiente conectar esos resumenes a datos reales si se define esa fase.
+
+## Fase actual: microinteracciones y navegación fluida
+
+### 1. Problema detectado
+
+La app ya tenia una base visual coherente, pero algunos elementos interactivos se sentian mas estaticos que las nuevas tarjetas de accesos rapidos en `/app`. El sidebar, botones y cards accionables necesitaban feedback visual mas claro para hover, focus y click sin perder la sobriedad FLEX.
+
+### 2. Cambios aplicados al sidebar
+
+- Se refinaron los items del sidebar en `AppShell` con hover dorado sutil, borde suave y transiciones de 200ms.
+- El item activo ahora combina fondo dorado discreto, borde visible e indicador lateral, para no depender solo del color.
+- Los iconos y textos cambian de color de forma gradual en hover y estado activo.
+- Se agrego `aria-current="page"` a los items activos de navegacion desktop y movil.
+- La navegacion movil adopta el mismo patron: estado activo con borde/fondo dorado sutil, hover claro y active state leve.
+- Los botones de cabecera del shell, como notificaciones, menu y salir, ahora comparten hover/focus/active sobrio.
+
+### 3. Cambios aplicados a botones/cards
+
+- `FlexButton` centraliza transiciones de background, border, shadow, color y transform en 200ms.
+- Los botones primarios, secundarios, danger y success tienen hover/focus mas coherente y active state leve al click.
+- `FlexCard` soporta transiciones suaves de fondo, borde, sombra y transform para que las cards clicables no cambien bruscamente.
+- `AdminQuickActionCard` se suavizo para alinear su hover con el resto de la app y evitar desplazamientos exagerados.
+- El focus global `.gold-focus` ahora muestra aro dorado con halo suave para teclado.
+- Se agrego soporte global simple a `prefers-reduced-motion` para reducir animaciones y transiciones si el usuario lo solicita.
+
+### 4. Que no se toco
+
+- No se modifico middleware.
+- No se cambio auth, Supabase, roles, RLS ni migraciones.
+- No se ejecutaron resets.
+- No se agregaron mocks ni dependencias.
+- No se cambiaron rutas ni navegacion por rol.
+- No se modifico logica de negocio.
+
+### 5. Como probar manualmente
+
+1. Iniciar sesion y navegar por `/app`, `/app/today`, `/app/song-request`, `/app/my-turn`, `/app/tickets` y `/app/vip`.
+2. En desktop, pasar el cursor por el sidebar y confirmar hover dorado sutil, iconos dorados y item activo claro.
+3. Usar Tab para recorrer sidebar, botones de cabecera y botones principales; confirmar focus visible con aro dorado.
+4. En movil, revisar la navegacion inferior y confirmar estado activo, hover/tap y ausencia de saltos de layout.
+5. Probar botones primarios y secundarios en distintas pantallas y confirmar hover suave y active state leve.
+6. Revisar tarjetas accionables como accesos rapidos y acciones admin para confirmar transiciones sobrias.
+
+### 6. Pendientes
+
+- Revisar pantallas placeholder futuras cuando se conviertan en flujos reales para aplicar el mismo patron.
+- Si se define un sistema de componentes mas completo, extraer tokens de movimiento y estados interactivos a utilidades compartidas.
+
+## Fase actual: próximos eventos con artistas
+
+### 1. Carpeta usada para imágenes
+
+Las imágenes locales de artistas/eventos se usan desde:
+
+- `public/images/events/arcangel.jpg`
+- `public/images/events/john-coltrane.jpg`
+- `public/images/events/nejo.jpg`
+
+Los archivos se normalizaron desde nombres con doble extension `.jpg.jpg` a nombres estables con extension real `.jpg`.
+
+### 2. Eventos integrados
+
+- `Jazz Nights`
+  - Artista: `John Coltrane`
+  - Fecha: `25 MAY`
+  - Zona: `Pista principal`
+  - Imagen: `/images/events/john-coltrane.jpg`
+  - Spotify: `https://open.spotify.com/intl-es/track/7b9GTuHH5QPglZrKQATW8Q`
+- `Latin Urban Night`
+  - Artista: `Arcangel`
+  - Fecha: `31 MAY`
+  - Zona: `Escenario live`
+  - Imagen: `/images/events/arcangel.jpg`
+  - Spotify: `https://open.spotify.com/intl-es/artist/4SsVbpTthjScTS7U2hmr1X`
+- `Reggaeton Classics`
+  - Artista: `Nejo`
+  - Fecha: `07 JUN`
+  - Zona: `Pista principal`
+  - Imagen: `/images/events/nejo.jpg`
+  - Spotify: `https://open.spotify.com/intl-es/artist/2OHKEe204spO7G7NcbeO2o`
+
+### 3. Rutas afectadas
+
+- `/`
+- `/app`
+- `/app/events/[eventId]`
+
+La ruta `/app/events` se mantiene con su carga real desde Supabase mediante `listPublishedEvents()`.
+El hero de `/` y el hero principal de `/app` apuntan ahora a `/images/events/john-coltrane.jpg` porque los assets anteriores de `public/images/` ya no estaban disponibles en el directorio.
+
+### 4. Fallback local o Supabase real
+
+Para esta fase se uso un fallback local documentado en `lib/featured-events.ts` para la seccion `Proximos eventos` de la home y para los detalles internos. No se crearon migraciones ni columnas nuevas porque la tabla real `events` no tiene todavia campos como `artist`, `image_url` o `artist_url` documentados para este flujo.
+
+### 5. Como funcionan los links
+
+- Las cards de `Proximos eventos` en `/app` son clickeables completas.
+- Cada card navega a una pagina interna de detalle:
+  - `/app/events/jazz-nights`
+  - `/app/events/latin-urban-night`
+  - `/app/events/reggaeton-classics`
+- Spotify no se abre desde la card de la home.
+- El boton `Ver artista en Spotify` vive en el detalle y abre el enlace externo en una nueva pestaña.
+
+### 6. Como agregar nuevos eventos/artistas
+
+1. Agregar la imagen en `public/images/events/` con nombre estable, sin espacios ni tildes.
+2. Agregar una entrada nueva en `lib/featured-events.ts` con `id`, `title`, `artist`, `date`, `zone`, `description`, `image` y `artistUrl`.
+3. Usar un `id` limpio porque sera parte de la ruta `/app/events/[eventId]`.
+4. Si en una fase futura se agregan campos reales a Supabase, migrar este fallback a datos reales sin reemplazar silenciosamente errores de Supabase por mocks.
+
+### 7. Como probar
+
+1. Abrir `/app`.
+2. Confirmar que `Proximos eventos` muestra John Coltrane, Arcangel y Nejo con sus imagenes locales.
+3. Confirmar que cada card completa navega a su detalle interno.
+4. Abrir cada detalle y confirmar imagen grande, titulo, artista, fecha, zona y descripcion.
+5. Pulsar `Ver artista en Spotify` y confirmar que abre el enlace externo correcto.
+6. Pulsar `Volver` y confirmar que regresa a la home de usuario.
+
+### 8. Pendientes
+
+- Conectar artistas, imagenes y enlaces externos a Supabase cuando se definan columnas o tablas reales para esos metadatos.
+- Mantener `/app/events` como lista real de eventos publicados y decidir si debe mezclar o no estos destacados locales.
+
+## Fase actual: eventos reales con imágenes administrables
+
+### 1. Problema detectado
+
+La home `/app` mostraba `Proximos eventos` con cards visuales buenas, imagenes locales y enlaces de Spotify, pero esos datos vivian como fallback local en `lib/featured-events.ts`. El panel `/admin/events` seguia limitado a campos basicos y no permitia administrar artista, imagen, link externo ni destacado en home.
+
+### 2. Auditoria de `public.events`
+
+Columnas existentes antes de esta fase:
+
+- `id`
+- `title`
+- `description`
+- `starts_at`
+- `ends_at`
+- `cover_image_path`
+- `capacity`
+- `ticket_price_cents`
+- `is_published`
+- `created_at`
+- `updated_at`
+
+Policies existentes:
+
+- `published events readable`: permite leer eventos publicados o a staff autenticado.
+- `admin manage events`: permite gestionar eventos solo a `public.is_admin()`.
+
+Columnas que faltaban para el flujo visual:
+
+- `image_url`
+- `artist_name`
+- `artist_url`
+- `external_url`
+- `featured`
+- `zone_name`
+
+`starts_at` e `is_published` ya existian, asi que no se duplicaron.
+
+### 3. Columnas agregadas
+
+Se creo la migracion incremental:
+
+- `supabase/migrations/20260603120000_event_media_admin_fields.sql`
+
+Agrega con `IF NOT EXISTS`:
+
+- `image_url text`
+- `artist_name text`
+- `artist_url text`
+- `external_url text`
+- `featured boolean not null default false`
+- `zone_name text`
+
+Tambien agrega el indice:
+
+- `events_featured_starts_at_idx`
+
+No se modificaron migraciones antiguas y no se ejecuto `supabase db reset`.
+
+### 4. Bucket usado
+
+Se define el bucket:
+
+- `event-images`
+
+La migracion lo crea como bucket publico para lectura de imagenes de eventos:
+
+- usuarios normales pueden ver imagenes publicas del bucket;
+- solo admin real puede insertar, actualizar o borrar objetos en `event-images`;
+- la validacion usa `public.is_admin()`.
+
+Si el proyecto ya esta corriendo y la migracion no se aplico aun, hay que aplicar migraciones desde el flujo normal de Supabase. No requiere reset por ser incremental.
+
+### 5. Cambios en `/admin/events`
+
+El admin ahora permite crear y editar:
+
+- titulo;
+- artista;
+- fecha/hora de inicio;
+- fecha/hora de fin;
+- zona;
+- descripcion;
+- imagen subida al bucket `event-images` o `image_url` pegada manualmente;
+- link Spotify/artista (`artist_url`);
+- link externo opcional (`external_url`);
+- capacidad;
+- precio en cents;
+- publicado/borrador;
+- destacado en home.
+
+Validaciones:
+
+- titulo requerido;
+- fecha requerida;
+- capacidad mayor que 0;
+- precio no negativo;
+- `artist_url` y `external_url` deben ser URL validas si se completan.
+
+### 6. Como aparecen en `/app`
+
+La seccion `Proximos eventos` ahora consulta eventos reales publicados desde Supabase:
+
+- filtra `is_published=true`;
+- prioriza `featured=true`;
+- muestra fechas futuras;
+- ordena por destacado y fecha;
+- usa `image_url` o `cover_image_path` si existe;
+- si falta imagen, muestra fallback visual elegante con gradiente FLEX;
+- mantiene hover premium: elevacion leve, borde dorado, zoom interno de imagen y flecha con desplazamiento.
+
+Si no hay eventos reales publicados futuros, se mantiene el fallback local de compatibilidad desde `lib/featured-events.ts`.
+
+### 7. Detalle de evento
+
+La ruta `/app/events/[eventId]` ahora carga eventos reales publicados por UUID desde Supabase. Tambien mantiene compatibilidad con los slugs locales anteriores:
+
+- `/app/events/jazz-nights`
+- `/app/events/latin-urban-night`
+- `/app/events/reggaeton-classics`
+
+El detalle muestra:
+
+- imagen grande o fallback visual;
+- titulo;
+- artista;
+- fecha/hora;
+- zona;
+- descripcion;
+- boton `Ver artista en Spotify` si existe `artist_url`;
+- boton `Volver`.
+
+### 8. Compatibilidad con imagenes locales
+
+Se mantienen como fallback/compatibilidad:
+
+- `public/images/events/arcangel.jpg`
+- `public/images/events/john-coltrane.jpg`
+- `public/images/events/nejo.jpg`
+
+Los nuevos eventos creados desde admin no dependen de estos archivos: usan `image_url` generado desde Supabase Storage o pegado manualmente.
+
+### 9. Como probar
+
+1. Aplicar la migracion incremental en Supabase local sin ejecutar reset.
+2. Iniciar sesion con un usuario admin real.
+3. Abrir `/admin/events`.
+4. Crear un evento con titulo, artista, fecha, zona, descripcion, imagen, link Spotify, `Publicado` y `Destacar en home`.
+5. Guardar y confirmar mensaje de exito.
+6. Abrir `/app` y confirmar que el evento aparece en `Proximos eventos`.
+7. Entrar en la card y confirmar que `/app/events/[eventId]` muestra el detalle real.
+8. Pulsar `Ver artista en Spotify` y confirmar que abre el enlace externo.
+9. Volver a `/admin/events`, editar imagen o quitar destacado y confirmar que `/app` refleja el cambio.
+
+### 10. Pendientes tecnicos
+
+- Decidir si `/app/events` debe mostrar tambien borradores a staff o solo publicados a usuarios.
+- Conectar compra real de entradas cuando el flujo Stripe de UI quede definido.
+- Evaluar si conviene relacionar `zone_name` con `club_zones` en vez de mantenerlo como texto libre.
+- Agregar borrado fisico de imagenes antiguas del bucket cuando se reemplacen, si se quiere limpiar storage automaticamente.
