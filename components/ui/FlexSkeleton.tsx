@@ -1,5 +1,5 @@
 export function FlexSkeleton({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded-md bg-white/[0.07] ${className}`} />;
+  return <div className={`skeleton-shimmer rounded-md bg-white/[0.055] ${className}`} />;
 }
 
 export function FlexSkeletonCard() {

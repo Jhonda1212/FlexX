@@ -3879,3 +3879,527 @@ Los nuevos eventos creados desde admin no dependen de estos archivos: usan `imag
 - Conectar compra real de entradas cuando el flujo Stripe de UI quede definido.
 - Evaluar si conviene relacionar `zone_name` con `club_zones` en vez de mantenerlo como texto libre.
 - Agregar borrado fisico de imagenes antiguas del bucket cuando se reemplacen, si se quiere limpiar storage automaticamente.
+
+---
+
+## Diagnostico y correccion de Proximos eventos en `/app` - 2026-06-04
+
+### Causa encontrada
+
+La migracion `supabase/migrations/20260603120000_event_media_admin_fields.sql` existia en el repositorio, pero no estaba aplicada en la base local. En `supabase_migrations.schema_migrations` solo aparecian las migraciones hasta `20260521103200`.
+
+Por eso la consulta de `listFeaturedPublishedEvents()` fallaba al seleccionar columnas que no existian todavia en `public.events`:
+
+- `image_url`
+- `artist_name`
+- `artist_url`
+- `external_url`
+- `featured`
+- `zone_name`
+
+Tambien faltaba el bucket publico `event-images`.
+
+### Correccion aplicada
+
+Se aplicaron las migraciones pendientes con:
+
+```bash
+supabase migration up
+```
+
+No se ejecuto `supabase db reset` y no se borraron usuarios ni datos locales.
+
+Despues de aplicar la migracion, `public.events` ya tiene las columnas de media/admin y `storage.buckets` contiene `event-images` como bucket publico.
+
+### Datos actuales observados
+
+La base local tenia estos eventos relevantes:
+
+- `Flex Live Sessions: Jazz Night`: publicado, pero con `starts_at` vencido.
+- `Llegada de Cosculluela`: publicado y futuro, pero sin `image_url`, `artist_name`, `artist_url`, `zone_name` ni `featured`.
+
+Esto significa que `/app` ya puede cargar un evento real futuro, pero el contenido visual/demo sigue incompleto hasta que se edite desde `/admin/events` o se ejecute un seed seguro.
+
+### Cambios de codigo
+
+- `components/app/HomeUpcomingEvents.tsx`: si Supabase devuelve un error real, se registra en consola solo en desarrollo y se muestra un mensaje elegante en UI.
+- `app/app/events/[eventId]/page.tsx`: la ruta dinamica ahora usa `await params`, compatible con Next 16.
+- `app/app/events/[eventId]/EventDetailClient.tsx`: se movio la logica cliente del detalle a un componente separado.
+
+### Snippet seguro creado
+
+Se creo:
+
+- `supabase/snippets/seed_demo_events_without_reset.sql`
+
+El snippet es idempotente y no hace reset. Actualiza por titulo si ya existen o inserta si faltan estos eventos demo:
+
+- John Coltrane / `Jazz Nights`
+- Arcangel / `Latin Urban Night`
+- Nejo / `Reggaeton Classics`
+
+Usa imagenes locales existentes en `public/images/events` y marca los eventos como publicados y destacados.
+
+### Consulta verificada en `/app`
+
+`listFeaturedPublishedEvents(3)` consulta `public.events` con:
+
+- `select`: `id, title, description, starts_at, ends_at, cover_image_path, image_url, artist_name, artist_url, external_url, featured, zone_name`
+- filtro `is_published=true`
+- filtro `starts_at >= now`
+- orden `featured desc`
+- orden `starts_at asc`
+- `limit 3`
+
+El fallback local solo se usa si no hay eventos reales publicados futuros. Si Supabase devuelve un error real y mocks no estan habilitados, no se oculta con mocks.
+
+### RLS verificado
+
+La politica activa en `public.events` sigue siendo:
+
+- `published events readable`: permite leer eventos publicados o eventos visibles para staff.
+- `admin manage events`: mantiene la gestion limitada a admin real.
+
+No se debilito middleware, roles ni auth.
+
+### Como probar
+
+1. Confirmar que Supabase local esta activo con `supabase status`.
+2. Abrir `/app`.
+3. Confirmar que `Proximos eventos` muestra el evento real futuro publicado.
+4. Abrir la card y confirmar navegacion a `/app/events/[eventId]`.
+5. Para tener las tres cards demo, ejecutar `supabase/snippets/seed_demo_events_without_reset.sql` desde Supabase Studio SQL Editor.
+6. Recargar `/app` y confirmar que los destacados aparecen primero.
+7. Abrir `/admin/events`, editar una imagen/artista/destacado y confirmar que `/app` refleja el cambio.
+
+### Pendiente
+
+- Ejecutar el snippet demo solo si se quieren datos demo completos en la base local. No se ejecuto automaticamente para evitar mezclar diagnostico de schema con cambios de contenido.
+
+---
+
+## Mejora visual de Hoy en FLEX `/app/today` - 2026-06-04
+
+### Que se cambio
+
+Se mejoro la presentacion visual de la pagina de usuario `/app/today` sin cambiar la logica de negocio ni la lectura real de Supabase.
+
+Cambios aplicados:
+
+- El layout de usuario ahora tiene encabezado especifico para `/app/today`:
+  - titulo: `Hoy en FLEX`
+  - subtitulo: `Promociones, eventos y avisos oficiales para vivir la noche.`
+- Se agrego una cabecera visual compacta tipo mural oficial del dia con fondo oscuro, dorado y rojo vino sutil.
+- Los filtros existentes se mantienen con los mismos valores y mejoran hover, focus, estado activo y scroll horizontal en mobile.
+- El empty state ahora es mas util y premium:
+  - titulo `La noche aun esta tranquila`
+  - texto explicativo para publicaciones futuras
+  - accesos secundarios a `/app` y `/app/vip`
+- Se agrego una tarjeta secundaria `Feed oficial` para explicar el uso del feed cuando hay poco contenido.
+- Las cards existentes de publicaciones mantienen su estructura y datos, con hover suave y elevacion ligera.
+
+### Logica no tocada
+
+No se modifico:
+
+- consulta a `daily_feed_posts`;
+- filtros por `is_published`, `starts_at` o `ends_at`;
+- ordenamiento por fijado, prioridad, fecha y creacion;
+- Supabase;
+- middleware;
+- auth;
+- roles;
+- RLS;
+- migraciones;
+- rutas existentes;
+- mocks.
+
+### Como probar
+
+1. Abrir `/app/today` con sesion de usuario.
+2. Confirmar que ya no aparece el encabezado generico `Bienvenido a FLEX` en desktop.
+3. Confirmar que la cabecera visual muestra `Hoy en FLEX`.
+4. Probar filtros: Todos, Eventos, Promos, Actividades, VIP, Escenario y Avisos.
+5. En mobile, confirmar que los filtros hacen scroll horizontal sin overflow de pagina.
+6. Si no hay publicaciones activas, confirmar el empty state con CTAs a `/app` y `/app/vip`.
+7. Si hay publicaciones activas, confirmar que se siguen renderizando y que las cards mantienen prioridad, tipo, titulo, descripcion y CTA.
+
+### Pendiente
+
+- Revisar copy final con acentos cuando se normalice la codificacion de textos existentes en el proyecto.
+
+---
+
+## Mejora de gestion de eventos reales en `/admin/events` - 2026-06-04
+
+### Que se cambio
+
+Se reforzo la pantalla `/admin/events` para crear y editar eventos reales que alimentan la seccion `Proximos eventos` de `/app`.
+
+La pantalla permite:
+
+- crear eventos;
+- editar eventos existentes;
+- publicar y despublicar;
+- marcar o quitar `featured`;
+- subir imagen al bucket publico `event-images`;
+- usar `image_url` manual con URL absoluta o ruta local;
+- abrir el detalle publicado en `/app/events/[eventId]`;
+- ver en el listado si un evento publicado y futuro queda `Visible home`.
+
+### Campos gestionados
+
+El formulario usa los campos reales de `public.events`:
+
+- `title` requerido;
+- `description`;
+- `starts_at` requerido;
+- `ends_at` opcional;
+- `capacity` opcional, con fallback local a `600` si se deja vacio;
+- `ticket_price_cents` opcional, con fallback local a `0` si se deja vacio;
+- `cover_image_path`;
+- `image_url`;
+- `artist_name`;
+- `artist_url`;
+- `external_url`;
+- `zone_name`;
+- `is_published`;
+- `featured`.
+
+### Validaciones
+
+- `title` y `starts_at` son obligatorios.
+- `artist_url` debe ser URL valida si se completa.
+- `external_url` debe ser URL valida si se completa.
+- `image_url` manual debe ser URL valida o ruta local que empiece por `/`.
+- `capacity` debe ser mayor que `0` si se completa.
+- `ticket_price_cents` no puede ser negativo.
+
+### Upload de imagen
+
+El upload real quedo implementado desde UI usando Supabase Storage:
+
+- bucket: `event-images`;
+- solo admins reales pueden subir por la policy del bucket;
+- despues de subir, se guarda la URL publica en `image_url` y tambien en `cover_image_path` para compatibilidad visual.
+
+Tambien se mantiene el campo manual `image_url` para pegar imagenes externas o rutas locales existentes.
+
+### Seguridad y logica no tocada
+
+No se modifico:
+
+- middleware;
+- auth;
+- roles;
+- RLS;
+- migraciones;
+- bucket policies;
+- lectura de `/app`;
+- detalle `/app/events/[eventId]`;
+- mocks.
+
+La pantalla sigue usando `requireAdmin()` antes de leer, crear, editar, publicar, destacar o subir imagenes.
+
+### Como hacer que aparezca en `/app`
+
+1. Entrar con usuario admin real.
+2. Abrir `/admin/events`.
+3. Crear o editar un evento.
+4. Completar `Titulo` y `Inicio`.
+5. Usar una fecha futura en `Inicio`.
+6. Activar `Publicado`.
+7. Activar `Destacar en home` si debe aparecer primero.
+8. Guardar.
+9. Abrir `/app` y revisar `Proximos eventos`.
+
+### Pendientes
+
+- Borrado fisico de imagenes antiguas en `event-images` cuando se reemplaza una imagen.
+- Relacionar `zone_name` con `club_zones` si se decide dejar de usar texto libre.
+- Conectar compra real de entradas cuando Stripe UI quede definido.
+
+---
+
+## Dinamismo visual de home `/app` y carrusel de eventos - 2026-06-04
+
+### Que se cambio
+
+Se reemplazo el hero fijo de `/app` por un carrusel visual de eventos, manteniendo la estetica FLEX oscura, dorada y premium.
+
+Archivos principales:
+
+- `components/app/HomeEventCarousel.tsx`
+- `app/app/page.tsx`
+- `components/app/HomeUpcomingEvents.tsx`
+- `components/app/HomeTodayPreview.tsx`
+- `app/globals.css`
+
+### Como funciona el carrusel
+
+El hero consulta eventos publicados futuros con la misma fuente usada para `Proximos eventos`:
+
+- `listFeaturedPublishedEvents(5)`
+- orden por `featured desc`
+- orden por `starts_at asc`
+- limite de 5 eventos
+
+Si hay menos de 3 eventos reales disponibles, el hero completa visualmente con el fallback local existente de `lib/featured-events.ts`. Esto es solo para que el carrusel no quede vacio o estatico; no cambia la consulta real ni crea mocks nuevos.
+
+El carrusel:
+
+- rota automaticamente cada 5.6 segundos;
+- pausa el autoplay cuando el usuario hace hover;
+- permite flecha anterior y siguiente;
+- muestra puntos indicadores;
+- el boton `Ver detalles` navega a `/app/events/[eventId]`;
+- respeta `prefers-reduced-motion` desactivando autoplay y animaciones fuertes.
+
+### Animaciones agregadas
+
+- Hero: transicion suave de opacidad, escala leve y entrada del contenido.
+- Proximos eventos: hover con elevacion leve, borde dorado, zoom interno de imagen, overlay dorado sutil y flecha con desplazamiento de 2px.
+- Accesos rapidos: hover alineado con elevacion leve y flecha contenida.
+- Hoy en FLEX: aparicion suave mediante clase `soft-enter`.
+
+### Logica no tocada
+
+No se modifico:
+
+- Supabase;
+- middleware;
+- auth;
+- roles;
+- RLS;
+- migraciones;
+- rutas;
+- `/app/events/[eventId]`;
+- `/admin/events`;
+- consulta de `daily_feed_posts`;
+- flujo de tickets, VIP, cola ni canciones.
+
+### Como probar
+
+1. Abrir `/app`.
+2. Confirmar que el hero muestra evento real publicado futuro si existe.
+3. Confirmar que rota cada 5 o 6 segundos.
+4. Hacer hover sobre el hero y verificar que se pausa.
+5. Usar flechas e indicadores para cambiar manualmente.
+6. Pulsar `Ver detalles` y confirmar navegacion a `/app/events/[eventId]`.
+7. Revisar hover de cards en `Proximos eventos`.
+8. Revisar mobile y confirmar que no hay overflow horizontal.
+9. Si el sistema tiene `prefers-reduced-motion`, confirmar que la experiencia queda estable y manual.
+
+### Pendientes
+
+- Evaluar si en el futuro conviene cargar imagenes con `next/image` cuando se estandaricen dominios remotos de Supabase Storage.
+
+---
+
+## Refinamiento minimalista del hero carrusel `/app` - 2026-06-04
+
+### Que se cambio
+
+Se refino el hero/carrusel principal de `/app` para que se vea mas limpio, sobrio y premium sin cambiar la logica de carga de eventos.
+
+Cambios visuales:
+
+- Se elimino el texto auxiliar `Rotacion suave`.
+- El badge queda fijo como `Evento destacado`.
+- El titulo del evento queda como elemento protagonista.
+- Artista, fecha, hora y zona se compactan en una sola linea secundaria.
+- La descripcion se limita a un bloque mas estrecho y con mas aire vertical.
+- El bloque de texto usa un ancho maximo menor para evitar saturacion visual.
+- Los controles se agruparon en una unica pastilla discreta con flechas e indicadores.
+- El overlay se ajusto para oscurecer mas la zona del texto y abrir suavemente hacia la imagen.
+
+### Logica no tocada
+
+No se modifico:
+
+- `listFeaturedPublishedEvents(5)`;
+- fallback visual existente;
+- autoplay de 5.6 segundos;
+- pausa en hover;
+- navegacion a `/app/events/[eventId]`;
+- Supabase;
+- auth;
+- middleware;
+- roles;
+- RLS;
+- migraciones;
+- `/admin/events`.
+
+### Como probar
+
+1. Abrir `/app`.
+2. Confirmar que el hero mantiene el carrusel y la rotacion automatica.
+3. Confirmar que ya no aparece `Rotacion suave`.
+4. Verificar que la linea secundaria muestra artista, fecha, hora y zona.
+5. Usar flechas e indicadores agrupados arriba a la derecha.
+6. Hacer hover sobre el hero y confirmar que el autoplay se pausa.
+7. Probar en mobile que controles y texto no se superponen ni generan overflow horizontal.
+
+---
+
+## Microinteracciones premium en home `/app` - 2026-06-04
+
+### Que se cambio
+
+Se agregaron microinteracciones sutiles para que la home se sienta mas viva sin perder sobriedad ni rendimiento.
+
+Cambios aplicados:
+
+- Barra de progreso fina en el hero/carrusel:
+  - se llena durante el intervalo de autoplay;
+  - se reinicia al cambiar de evento;
+  - se pausa cuando el carrusel esta en hover;
+  - se oculta si `prefers-reduced-motion` esta activo.
+- Entrada suave de secciones principales:
+  - hero;
+  - accesos rapidos;
+  - Hoy en FLEX;
+  - Proximos eventos.
+- Botones principales:
+  - brillo dorado sutil en hover;
+  - elevacion minima;
+  - active con escala leve.
+- Skeletons:
+  - base mas oscura;
+  - brillo dorado muy suave;
+  - sin animacion agresiva.
+- Cards de eventos mantienen hover premium con zoom interno leve, overlay dorado sutil, borde dorado y flecha contenida.
+
+### Que se evito
+
+- No se agregaron librerias.
+- No se usaron rebotes ni animaciones tipo gaming.
+- No se animaron todas las piezas con la misma intensidad.
+- No se cambiaron textos, rutas ni datos.
+- No se agregaron animaciones pesadas sobre imagenes grandes.
+
+### Logica no tocada
+
+No se modifico:
+
+- Supabase;
+- auth;
+- middleware;
+- roles;
+- RLS;
+- migraciones;
+- consulta de eventos;
+- consulta de `daily_feed_posts`;
+- `/app/events/[eventId]`;
+- `/admin/events`;
+- reglas de negocio.
+
+### Como probar
+
+1. Abrir `/app`.
+2. Confirmar que el hero muestra una linea fina de progreso dorada abajo.
+3. Esperar el autoplay y verificar que la barra se reinicia al cambiar de evento.
+4. Hacer hover sobre el hero y confirmar que la barra se pausa.
+5. Usar flechas o puntos y confirmar que el progreso reinicia.
+6. Recargar y observar entrada suave de hero, accesos, Hoy en FLEX y Proximos eventos.
+7. Revisar hover/active de botones.
+8. Revisar loading de eventos o feed y confirmar skeleton oscuro con brillo suave.
+9. En mobile, confirmar que no aparece overflow horizontal.
+
+---
+
+## Fase actual: precios de entradas por zona - 2026-06-04
+
+### Problema detectado
+
+`public.events.ticket_price_cents` solo permite un precio generico por evento. Para eventos reales de FLEX se necesita manejar precios por zona o tipo de entrada, por ejemplo General, Pista principal o VIP Lounge.
+
+### Base de datos
+
+Se creo la migracion incremental:
+
+- `supabase/migrations/20260604160000_event_ticket_tiers.sql`
+
+Nueva tabla:
+
+- `public.event_ticket_tiers`
+
+Campos principales:
+
+- `event_id`: referencia a `public.events(id)` con `on delete cascade`.
+- `name`: nombre del tipo de entrada.
+- `zone_name`: zona asociada.
+- `description`: descripcion visible.
+- `price_cents`: precio en centimos.
+- `currency`: moneda, por defecto `EUR`.
+- `capacity`: cupo opcional.
+- `available_quantity`: disponibilidad opcional.
+- `active`: controla si se muestra al usuario.
+- `sort_order`: orden visual.
+
+La migracion agrega indices por `event_id`, `active` y `sort_order`, y reutiliza `public.set_updated_at()` para mantener `updated_at`.
+
+### RLS aplicada
+
+RLS queda habilitado en `public.event_ticket_tiers`.
+
+Policies:
+
+- Usuarios autenticados pueden leer tiers activos de eventos publicados.
+- Staff autenticado con rol operativo puede leer todos los tiers.
+- Admin puede insertar, actualizar y eliminar tiers.
+
+No se modificaron middleware, auth, roles ni policies existentes de otras tablas.
+
+### App usuario
+
+En `/app`, las cards de `Proximos eventos` muestran el precio minimo activo:
+
+- Si hay tiers activos: `Desde 20 EUR`.
+- Si no hay tiers: fallback a `events.ticket_price_cents`.
+- Si no hay precio disponible: `Precio por anunciar`.
+
+En `/app/events/[eventId]` se agrego la seccion `Entradas disponibles`:
+
+- lista los tiers activos del evento;
+- muestra nombre, zona, descripcion, precio y disponibilidad si existe;
+- incluye boton visual `Seleccionar` por tier.
+
+### Admin events
+
+En `/admin/events` se agrego la seccion `Precios por zona` al editar un evento existente.
+
+El admin puede:
+
+- listar tiers del evento;
+- crear tiers;
+- editar tiers;
+- activar o desactivar tiers.
+
+No se implemento borrado desde UI en esta fase. La alternativa segura es desactivar el tier.
+
+### Snippet demo
+
+Se creo:
+
+- `supabase/snippets/seed_event_ticket_tiers_without_reset.sql`
+
+El snippet es idempotente y agrega o actualiza tiers demo para eventos publicados existentes:
+
+- General
+- Pista principal
+- VIP Lounge
+
+Uso recomendado:
+
+1. Aplicar la migracion con `supabase migration up`.
+2. Ejecutar el snippet en Supabase SQL Editor o `psql`.
+3. Abrir `/app` y confirmar precios en `Proximos eventos`.
+4. Abrir `/app/events/[eventId]` y confirmar `Entradas disponibles`.
+
+### Pendientes
+
+- Checkout real por tier.
+- Reserva/stock real por `available_quantity`.
+- Integracion Stripe por tipo de entrada.
+- Historial de cambios de precios.

@@ -70,6 +70,71 @@ select {
   border: 1px solid rgba(217, 166, 64, 0.38);
 }
 
+.soft-enter {
+  animation: soft-enter 320ms ease-out both;
+}
+
+.soft-enter-delay-1 {
+  animation-delay: 70ms;
+}
+
+.soft-enter-delay-2 {
+  animation-delay: 130ms;
+}
+
+.soft-enter-delay-3 {
+  animation-delay: 190ms;
+}
+
+@keyframes soft-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero-progress {
+  animation-name: hero-progress;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  transform-origin: left center;
+}
+
+@keyframes hero-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.045), rgba(217, 166, 64, 0.045));
+}
+
+.skeleton-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(240, 194, 100, 0.08), transparent);
+  animation: skeleton-shimmer 1.8s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -78,5 +143,14 @@ select {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .soft-enter {
+    animation: none !important;
+  }
+
+  .hero-progress,
+  .skeleton-shimmer::after {
+    animation: none !important;
   }
 }

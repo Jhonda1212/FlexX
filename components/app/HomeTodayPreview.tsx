@@ -98,7 +98,7 @@ export function HomeTodayPreview() {
       {posts.length > 0 ? (
         <div className="grid gap-3 sm:grid-cols-3">
           {posts.map((post) => (
-            <div key={post.id} className="rounded-md border border-white/10 bg-white/[0.03] p-4">
+            <div key={post.id} className="rounded-md border border-white/10 bg-white/[0.03] p-4 transition-[background-color,border-color,transform] duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--gold)]/30 hover:bg-white/[0.05]">
               <FlexBadge tone={toneForPriority(post.priority)}>{post.type}</FlexBadge>
               <div className="mt-3 line-clamp-2 text-sm font-bold text-white">{post.title}</div>
             </div>

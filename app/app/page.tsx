@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Crown, Mic2, Music, QrCode, Sparkles } from "lucide-react";
+import { HomeEventCarousel } from "@/components/app/HomeEventCarousel";
 import { HomeTodayPreview } from "@/components/app/HomeTodayPreview";
 import { HomeUpcomingEvents } from "@/components/app/HomeUpcomingEvents";
 import { FlexBadge } from "@/components/ui/FlexBadge";
@@ -23,31 +24,9 @@ export default function UserDashboard() {
           <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Tus canciones y tus accesos en un solo lugar.</p>
         </div>
 
-        <FlexCard className="overflow-hidden p-0">
-          <div className="relative min-h-[360px] p-6 sm:p-9">
-            <div className="absolute inset-0 bg-[url('/images/events/john-coltrane.jpg')] bg-cover bg-center opacity-80" />
-            <div className="absolute inset-0 bg-gradient-to-r from-black via-black/68 to-black/20" />
-            <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black to-transparent" />
-            <div className="relative z-10 flex min-h-[288px] max-w-xl flex-col justify-end">
-              <span className="inline-flex w-fit rounded-full border border-[var(--gold)]/25 bg-[var(--gold)]/12 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--gold-bright)]">
-                Próxima Live Session
-              </span>
-              <h2 className="font-display mt-5 text-6xl font-bold leading-none text-white sm:text-7xl">Jazz Nights</h2>
-              <div className="mt-4 flex flex-wrap gap-2 text-sm text-white/82">
-                <span>Sábado 25 MAY</span>
-                <span className="text-[var(--gold)]">22:00</span>
-                <span>Pista principal</span>
-              </div>
-              <Link href="/app/events/jazz-nights">
-                <FlexButton className="mt-6 w-full sm:w-auto">
-                  Ver detalles <ArrowRight size={18} />
-                </FlexButton>
-              </Link>
-            </div>
-          </div>
-        </FlexCard>
+        <HomeEventCarousel />
 
-        <section>
+        <section className="soft-enter soft-enter-delay-1">
           <div className="mb-4 flex items-center justify-between gap-4">
             <h2 className="text-sm font-bold uppercase tracking-[0.08em] text-white">Accesos rápidos</h2>
             <Sparkles className="text-[var(--gold)]" size={18} />
@@ -57,12 +36,12 @@ export default function UserDashboard() {
               const Icon = action.icon;
               return (
                 <Link key={action.href} href={action.href} className="gold-focus group block h-full rounded-lg">
-                  <FlexCard className="flex min-h-[136px] h-full flex-col border border-white/10 bg-white/[0.035] transition duration-200 group-hover:border-[var(--gold)]/50 group-hover:bg-white/[0.055] group-focus-visible:border-[var(--gold)]/60">
+                  <FlexCard className="flex min-h-[136px] h-full flex-col border border-white/10 bg-white/[0.035] transition-[background-color,border-color,box-shadow,transform] duration-200 ease-out group-hover:-translate-y-0.5 group-hover:border-[var(--gold)]/50 group-hover:bg-white/[0.055] group-hover:shadow-[0_14px_34px_rgba(0,0,0,0.2)] group-focus-visible:border-[var(--gold)]/60">
                     <div className="flex items-start justify-between gap-4">
                       <div className="grid size-11 place-items-center rounded-md bg-[var(--gold)]/10 text-[var(--gold)] transition group-hover:bg-[var(--gold)]/15">
                         <Icon size={24} />
                       </div>
-                      <ArrowRight className="text-white/35 transition group-hover:translate-x-1 group-hover:text-[var(--gold)]" size={18} />
+                      <ArrowRight className="text-white/35 transition-transform duration-200 ease-out group-hover:translate-x-0.5 group-hover:text-[var(--gold)]" size={18} />
                     </div>
                     <div className="mt-auto pt-5">
                       <div className="text-base font-bold text-white">{action.label}</div>
@@ -75,7 +54,9 @@ export default function UserDashboard() {
           </div>
         </section>
 
-        <HomeTodayPreview />
+        <div className="soft-enter soft-enter-delay-2">
+          <HomeTodayPreview />
+        </div>
       </div>
 
       <aside className="space-y-6 xl:sticky xl:top-8 xl:col-start-2 xl:row-span-2 xl:row-start-1 xl:self-start">
@@ -118,7 +99,7 @@ export default function UserDashboard() {
         </FlexCard>
       </aside>
 
-      <section className="space-y-4 xl:col-start-1">
+      <section className="soft-enter soft-enter-delay-3 space-y-4 xl:col-start-1">
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-sm font-bold uppercase tracking-[0.08em] text-white">Próximos eventos</h2>
           <Link href="/app/events" className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--gold)]">Ver todos</Link>

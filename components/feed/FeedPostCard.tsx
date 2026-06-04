@@ -27,7 +27,7 @@ function formatRange(start: string | null, end: string | null) {
 
 export function FeedPostCard({ post }: { post: FeedPostView }) {
   return (
-    <article className={`rounded-lg border p-5 transition ${post.is_pinned ? "border-[var(--gold)]/55 bg-[var(--gold)]/10" : "border-white/10 bg-white/[0.035] hover:border-[var(--gold)]/35 hover:bg-white/[0.055]"}`}>
+    <article className={`rounded-lg border p-5 transition-[background-color,border-color,box-shadow,transform] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_18px_46px_rgba(0,0,0,0.28)] ${post.is_pinned ? "border-[var(--gold)]/55 bg-[var(--gold)]/10 hover:border-[var(--gold)]/70" : "border-white/10 bg-white/[0.035] hover:border-[var(--gold)]/35 hover:bg-white/[0.055]"}`}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex gap-4">
           <div className="grid size-14 shrink-0 place-items-center rounded-md border border-[var(--gold)]/25 bg-black/35 text-3xl">

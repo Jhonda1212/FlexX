@@ -12,6 +12,10 @@ export default function UserLayout({ children }: { children: React.ReactNode }) 
         title="Bienvenido a FLEX"
         subtitle="Tu noche, tus canciones y tus accesos en un solo lugar."
         routeHeaders={{
+          "/app/today": {
+            title: "Hoy en FLEX",
+            subtitle: "Promociones, eventos y avisos oficiales para vivir la noche."
+          },
           "/app/profile": {
             title: "Mi perfil",
             subtitle: "Gestiona tu cuenta, seguridad y preferencias."

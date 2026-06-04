@@ -53,6 +53,7 @@ export type FeaturedEventView = {
   description: string | null;
   startsAt: string;
   endsAt: string | null;
+  ticketPriceCents: number | null;
   dateLabel: string;
   zone: string | null;
   imageUrl: string | null;
@@ -60,6 +61,21 @@ export type FeaturedEventView = {
   externalUrl: string | null;
   featured: boolean;
   source: "supabase" | "local";
+};
+
+export type EventTicketTierView = {
+  id: string;
+  eventId: string;
+  name: string;
+  zoneName: string | null;
+  description: string | null;
+  priceCents: number;
+  currency: string;
+  capacity: number | null;
+  availableQuantity: number | null;
+  active: boolean;
+  sortOrder: number;
+  priceLabel: string;
 };
 
 export type VipRoom = {
@@ -120,6 +136,7 @@ function localFeaturedEvents(): FeaturedEventView[] {
     description: event.description,
     startsAt: localEventDateIso(event.date),
     endsAt: null,
+    ticketPriceCents: null,
     dateLabel: event.date,
     zone: event.zone,
     imageUrl: event.image,
@@ -138,6 +155,7 @@ function mapFeaturedEvent(event: any): FeaturedEventView {
     description: (event.description as string | null) ?? null,
     startsAt: event.starts_at as string,
     endsAt: (event.ends_at as string | null) ?? null,
+    ticketPriceCents: (event.ticket_price_cents as number | null) ?? null,
     dateLabel: formatDateLabel(event.starts_at as string),
     zone: (event.zone_name as string | null) ?? "FLEX",
     imageUrl: (event.image_url as string | null) ?? (event.cover_image_path as string | null) ?? null,
@@ -152,12 +170,77 @@ function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+export function formatTicketPrice(priceCents: number, currency = "EUR") {
+  const value = priceCents / 100;
+  const hasDecimals = priceCents % 100 !== 0;
+  const amount = new Intl.NumberFormat("es-ES", {
+    minimumFractionDigits: hasDecimals ? 2 : 0,
+    maximumFractionDigits: hasDecimals ? 2 : 0
+  }).format(value);
+  return `${amount} ${currency.toUpperCase()}`;
+}
+
+function mapTicketTier(tier: any): EventTicketTierView {
+  const priceCents = tier.price_cents as number;
+  const currency = (tier.currency as string | null) ?? "EUR";
+  return {
+    id: tier.id as string,
+    eventId: tier.event_id as string,
+    name: tier.name as string,
+    zoneName: (tier.zone_name as string | null) ?? null,
+    description: (tier.description as string | null) ?? null,
+    priceCents,
+    currency,
+    capacity: (tier.capacity as number | null) ?? null,
+    availableQuantity: (tier.available_quantity as number | null) ?? null,
+    active: Boolean(tier.active),
+    sortOrder: tier.sort_order as number,
+    priceLabel: formatTicketPrice(priceCents, currency)
+  };
+}
+
+export function groupTicketTiersByEvent(tiers: EventTicketTierView[]) {
+  return tiers.reduce<Record<string, EventTicketTierView[]>>((grouped, tier) => {
+    grouped[tier.eventId] = [...(grouped[tier.eventId] ?? []), tier];
+    return grouped;
+  }, {});
+}
+
+export function minimumTicketPriceLabel(tiers: EventTicketTierView[], fallbackPriceCents?: number | null) {
+  const activePrices = tiers.filter((tier) => tier.active).sort((a, b) => a.priceCents - b.priceCents);
+  if (activePrices[0]) return `Desde ${activePrices[0].priceLabel}`;
+  if (typeof fallbackPriceCents === "number" && fallbackPriceCents > 0) return `Desde ${formatTicketPrice(fallbackPriceCents)}`;
+  return "Precio por anunciar";
+}
+
+export async function listActiveTicketTiersForEvents(eventIds: string[]): Promise<EventTicketTierView[]> {
+  const ids = eventIds.filter(isUuid);
+  if (!ids.length) return [];
+
+  const supabase = createBrowserSupabase();
+  const { data, error } = await supabase
+    .from("event_ticket_tiers")
+    .select("id, event_id, name, zone_name, description, price_cents, currency, capacity, available_quantity, active, sort_order")
+    .in("event_id", ids)
+    .eq("active", true)
+    .order("sort_order", { ascending: true })
+    .order("price_cents", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []).map(mapTicketTier);
+}
+
+export async function listActiveTicketTiersForEvent(eventId: string): Promise<EventTicketTierView[]> {
+  if (!isUuid(eventId)) return [];
+  return listActiveTicketTiersForEvents([eventId]);
+}
+
 export async function listFeaturedPublishedEvents(limit = 3): Promise<FeaturedEventView[]> {
   const supabase = createBrowserSupabase();
   const now = new Date().toISOString();
   const { data, error } = await supabase
     .from("events")
-    .select("id, title, description, starts_at, ends_at, cover_image_path, image_url, artist_name, artist_url, external_url, featured, zone_name")
+    .select("id, title, description, starts_at, ends_at, ticket_price_cents, cover_image_path, image_url, artist_name, artist_url, external_url, featured, zone_name")
     .eq("is_published", true)
     .gte("starts_at", now)
     .order("featured", { ascending: false })
@@ -180,7 +263,7 @@ export async function getPublishedEventDetail(eventId: string): Promise<Featured
   const supabase = createBrowserSupabase();
   const { data, error } = await supabase
     .from("events")
-    .select("id, title, description, starts_at, ends_at, cover_image_path, image_url, artist_name, artist_url, external_url, featured, zone_name")
+    .select("id, title, description, starts_at, ends_at, ticket_price_cents, cover_image_path, image_url, artist_name, artist_url, external_url, featured, zone_name")
     .eq("id", eventId)
     .eq("is_published", true)
     .maybeSingle();
