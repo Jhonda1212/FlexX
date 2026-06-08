@@ -62,7 +62,7 @@ select {
 .surface {
   background: linear-gradient(145deg, rgba(25, 25, 25, 0.94), rgba(8, 8, 8, 0.96));
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.3);
 }
 
 .gold-surface {
@@ -84,6 +84,15 @@ select {
 
 .soft-enter-delay-3 {
   animation-delay: 190ms;
+}
+
+.content-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 420px;
+}
+
+.paint-contain {
+  contain: layout paint style;
 }
 
 @keyframes soft-enter {
@@ -126,7 +135,7 @@ select {
   inset: 0;
   transform: translateX(-100%);
   background: linear-gradient(90deg, transparent, rgba(240, 194, 100, 0.08), transparent);
-  animation: skeleton-shimmer 1.8s ease-in-out infinite;
+  animation: skeleton-shimmer 2.2s ease-in-out infinite;
 }
 
 @keyframes skeleton-shimmer {

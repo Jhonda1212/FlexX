@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { FlexButton } from "@/components/ui/FlexButton";
 import { FlexCard } from "@/components/ui/FlexCard";
 import { FlexSkeleton } from "@/components/ui/FlexSkeleton";
+import { OptimizedBackdropImage } from "@/components/ui/OptimizedBackdropImage";
 import { featuredEvents } from "@/lib/featured-events";
 import { listFeaturedPublishedEvents, type FeaturedEventView } from "@/lib/flex-actions";
 
@@ -66,7 +67,12 @@ function useReducedMotion() {
   return reducedMotion;
 }
 
-export function HomeEventCarousel() {
+function isNearbySlide(index: number, activeIndex: number, total: number) {
+  if (total <= 3) return true;
+  return index === activeIndex || index === (activeIndex + 1) % total || index === (activeIndex - 1 + total) % total;
+}
+
+function HomeEventCarouselComponent() {
   const [events, setEvents] = useState<FeaturedEventView[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -121,11 +127,11 @@ export function HomeEventCarousel() {
   if (loading) {
     return (
       <FlexCard className="overflow-hidden p-0">
-        <div className="relative min-h-[360px] p-6 sm:p-9">
+        <div className="relative min-h-[300px] p-5 sm:min-h-[330px] sm:p-7 2xl:min-h-[380px] 2xl:p-9">
           <FlexSkeleton className="absolute inset-0 rounded-none" />
-          <div className="relative z-10 flex min-h-[288px] max-w-xl flex-col justify-end">
+          <div className="relative z-10 flex min-h-[240px] max-w-xl flex-col justify-end sm:min-h-[270px] 2xl:min-h-[310px]">
             <FlexSkeleton className="h-7 w-40" />
-            <FlexSkeleton className="mt-5 h-16 w-72" />
+            <FlexSkeleton className="mt-4 h-14 w-72" />
             <FlexSkeleton className="mt-4 h-5 w-64" />
             <FlexSkeleton className="mt-6 h-12 w-40" />
           </div>
@@ -141,39 +147,50 @@ export function HomeEventCarousel() {
   return (
     <FlexCard className="soft-enter group overflow-hidden p-0">
       <div
-        className="relative min-h-[360px] overflow-hidden p-6 sm:p-10"
+        className="relative min-h-[300px] overflow-hidden p-5 sm:min-h-[330px] sm:p-7 lg:min-h-[340px] xl:p-8 2xl:min-h-[390px] 2xl:p-10"
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
       >
         {events.map((event, index) => {
           const active = index === activeIndex;
+          if (!isNearbySlide(index, activeIndex, events.length)) return null;
+
           return (
             <div
               key={`${event.id}-${index}`}
-              className={`absolute inset-0 bg-cover bg-center transition-[opacity,transform,filter] duration-700 ease-out ${
+              className={`absolute inset-0 overflow-hidden transition-[opacity,transform] duration-500 ease-out ${
                 active
-                  ? "scale-100 opacity-80 blur-0"
-                  : "scale-[1.025] opacity-0 blur-[1px]"
+                  ? "scale-100 opacity-95"
+                  : "scale-[1.015] opacity-0"
               } ${reducedMotion ? "!transform-none !transition-none" : ""}`}
-              style={{ backgroundImage: event.imageUrl ? `url(${event.imageUrl})` : undefined }}
             >
-              {!event.imageUrl ? <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(217,166,64,0.18),rgba(8,8,8,0.96)_56%,rgba(76,18,18,0.22))]" /> : null}
+              {event.imageUrl ? (
+                <OptimizedBackdropImage
+                  src={event.imageUrl}
+                  alt=""
+                  priority={index === 0}
+                  sizes="(max-width: 1024px) 100vw, (max-width: 1536px) calc(100vw - 280px), calc(100vw - 680px)"
+                  className="absolute inset-0"
+                />
+              ) : (
+                <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(217,166,64,0.18),rgba(8,8,8,0.96)_56%,rgba(76,18,18,0.22))]" />
+              )}
             </div>
           );
         })}
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.90)_0%,rgba(0,0,0,0.76)_34%,rgba(0,0,0,0.38)_64%,rgba(0,0,0,0.10)_100%)]" />
-        <div className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-black/78 via-black/28 to-transparent" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_20%,rgba(217,166,64,0.11),transparent_26rem)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.88)_0%,rgba(0,0,0,0.72)_36%,rgba(0,0,0,0.28)_68%,rgba(0,0,0,0.04)_100%)]" />
+        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/72 via-black/24 to-transparent" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_18%,rgba(217,166,64,0.09),transparent_24rem)]" />
 
         <div
           key={activeEvent.id}
-          className={`soft-enter relative z-10 flex min-h-[300px] max-w-xl flex-col justify-end ${reducedMotion ? "!animate-none" : ""}`}
+          className={`soft-enter relative z-10 flex min-h-[238px] max-w-[36rem] flex-col justify-end pr-0 sm:min-h-[272px] sm:pr-28 lg:pr-36 xl:pr-0 2xl:min-h-[320px] ${reducedMotion ? "!animate-none" : ""}`}
         >
-          <span className="inline-flex w-fit rounded-full border border-[var(--gold)]/25 bg-black/42 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--gold-bright)]">
-            Evento destacado
+          <span className="inline-flex w-fit rounded-full border border-[var(--gold)]/25 bg-black/46 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--gold-bright)] sm:text-[11px]">
+            EVENTO DESTACADO
           </span>
-          <h2 className="font-display mt-5 text-5xl font-bold leading-none text-white sm:text-7xl">{activeEvent.title}</h2>
-          <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-white/78">
+          <h2 className="font-display mt-4 line-clamp-2 max-w-[15ch] text-4xl font-bold leading-[0.96] text-white [text-wrap:balance] sm:text-5xl lg:text-[3.35rem] 2xl:text-6xl">{activeEvent.title}</h2>
+          <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-white/78 sm:text-sm">
             <span className="font-semibold text-white/88">{activeEvent.artist || "FLEX Live"}</span>
             <span className="text-[var(--gold)]/70">·</span>
             <span>{dateParts[0]} {dateParts[1]}</span>
@@ -182,23 +199,23 @@ export function HomeEventCarousel() {
             <span className="text-[var(--gold)]/70">·</span>
             <span>{activeEvent.zone || "FLEX"}</span>
           </div>
-          {activeEvent.description ? <p className="mt-5 max-w-lg text-sm leading-6 text-white/70">{activeEvent.description}</p> : null}
-          <Link href={`/app/events/${activeEvent.id}`} className="mt-7 w-full sm:w-fit">
+          {activeEvent.description ? <p className="mt-4 line-clamp-1 max-w-lg text-sm leading-6 text-white/72 sm:line-clamp-2">{activeEvent.description}</p> : null}
+          <Link href={`/app/events/${activeEvent.id}`} prefetch={false} className="mt-5 w-full sm:w-fit">
             <FlexButton className="w-full sm:w-auto">
               Ver detalles <ArrowRight size={18} />
             </FlexButton>
           </Link>
         </div>
 
-        <div className="absolute right-4 top-4 z-10 flex items-center gap-2 rounded-full border border-white/10 bg-black/38 p-1.5 shadow-[0_14px_34px_rgba(0,0,0,0.24)] backdrop-blur sm:right-7 sm:top-7">
+        <div className="absolute right-4 top-4 z-10 flex items-center gap-1.5 rounded-full border border-white/10 bg-black/42 p-1 shadow-[0_8px_18px_rgba(0,0,0,0.14)] sm:right-6 sm:top-6 2xl:right-8 2xl:top-8">
           <button
-            className="gold-focus grid size-8 place-items-center rounded-full text-white/68 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+            className="gold-focus grid size-9 place-items-center rounded-full text-white/58 transition-[background-color,color,opacity] duration-200 ease-out hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-35 sm:size-8"
             aria-label="Evento anterior"
             disabled={!canRotate}
             onClick={() => move("previous")}
             type="button"
           >
-            <ChevronLeft size={20} />
+            <ChevronLeft size={18} />
           </button>
           <div className="flex items-center gap-1.5 px-1">
             {events.map((event, index) => (
@@ -206,29 +223,29 @@ export function HomeEventCarousel() {
                 key={`${event.id}-dot-${index}`}
                 type="button"
                 aria-label={`Mostrar evento ${index + 1}`}
-                className={`gold-focus h-2 rounded-full transition-[background-color,width,opacity] duration-200 ${
-                  index === activeIndex ? "w-6 bg-[var(--gold)]" : "w-2 bg-white/32 hover:bg-white/58"
+                className={`gold-focus h-2 w-2 rounded-full transition-[background-color,opacity] duration-200 ${
+                  index === activeIndex ? "bg-[var(--gold-bright)] opacity-100" : "bg-white/28 opacity-55 hover:bg-white/52 hover:opacity-80"
                 }`}
                 onClick={() => setActiveIndex(index)}
               />
             ))}
           </div>
           <button
-            className="gold-focus grid size-8 place-items-center rounded-full text-white/68 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+            className="gold-focus grid size-9 place-items-center rounded-full text-white/58 transition-[background-color,color,opacity] duration-200 ease-out hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-35 sm:size-8"
             aria-label="Evento siguiente"
             disabled={!canRotate}
             onClick={() => move("next")}
             type="button"
           >
-            <ChevronRight size={20} />
+            <ChevronRight size={18} />
           </button>
         </div>
 
         {canRotate && !reducedMotion ? (
-          <div className="absolute inset-x-0 bottom-0 z-10 h-px bg-white/10">
+          <div className="absolute inset-x-5 bottom-4 z-10 h-1 overflow-hidden rounded-full bg-white/10 sm:inset-x-7 2xl:inset-x-10">
             <div
               key={activeIndex}
-              className="hero-progress h-full bg-[linear-gradient(90deg,rgba(217,166,64,0.18),rgba(240,194,100,0.82))]"
+              className="hero-progress h-full rounded-full bg-[linear-gradient(90deg,rgba(217,166,64,0.18),rgba(240,194,100,0.78))]"
               style={{
                 animationDuration: `${carouselIntervalMs}ms`,
                 animationPlayState: paused ? "paused" : "running"
@@ -240,3 +257,5 @@ export function HomeEventCarousel() {
     </FlexCard>
   );
 }
+
+export const HomeEventCarousel = memo(HomeEventCarouselComponent);

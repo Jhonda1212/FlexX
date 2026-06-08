@@ -4403,3 +4403,667 @@ Uso recomendado:
 - Reserva/stock real por `available_quantity`.
 - Integracion Stripe por tipo de entrada.
 - Historial de cambios de precios.
+
+---
+
+## Mejora visual del detalle de evento `/app/events/[eventId]` - 2026-06-08
+
+### Que se cambio
+
+Se amplio la pagina de detalle de evento para que el contenido posterior al hero no quede vacio y mantenga una presentacion mas completa, premium y util para el usuario.
+
+Cambios aplicados:
+
+- Se mantiene el hero principal con imagen grande, overlay oscuro, badge `Proximo evento` o `Evento destacado`, titulo, artista y descripcion.
+- Si la descripcion esta vacia o es demasiado corta, se usa un fallback editorial breve:
+  `Una experiencia musical disenada para vivir la noche con ritmo, ambiente premium y conexion con el escenario.`
+- Debajo del hero se agrego una zona principal con tarjetas:
+  - `Sobre el evento`;
+  - `Programacion`;
+  - `Experiencia incluida`.
+- `Experiencia incluida` muestra highlights visuales con iconos existentes de `lucide-react`:
+  - Ambiente premium;
+  - Pista principal;
+  - Musica en vivo / DJ set;
+  - Zonas VIP disponibles.
+- `Programacion` muestra una card compacta con apertura, live session / show principal y DJ set / cierre, usando la hora real de `starts_at` para el show principal y copy de proximamente para los detalles no existentes.
+- La sidebar mantiene fecha, zona, artista, entradas, boton Spotify si existe `artist_url` y boton `Volver`, con espaciado y bloques internos mas suaves.
+- `Entradas disponibles` muestra el resumen `Desde X EUR` cuando hay tiers activos o precio base; si no hay tiers, mantiene un mensaje elegante sin crear nueva logica.
+
+### Logica no tocada
+
+No se modifico:
+
+- Supabase;
+- migraciones;
+- `event_ticket_tiers`;
+- pagos;
+- Stripe;
+- middleware;
+- auth;
+- roles;
+- RLS;
+- rutas `/app` ni `/app/events`;
+- consultas existentes de detalle de evento y tiers activos.
+
+### Como probar
+
+1. Abrir `/app/events/[eventId]` con un evento publicado.
+2. Confirmar que el hero conserva imagen, badge, titulo, artista y descripcion legible.
+3. Revisar que debajo del hero aparecen `Sobre el evento`, `Programacion` y `Experiencia incluida`.
+4. Confirmar que la sidebar muestra fecha, zona, artista, resumen de precio y tiers si existen.
+5. Confirmar que `Ver artista en Spotify` solo aparece si el evento tiene `artist_url`.
+6. Probar en mobile que la sidebar baja debajo del contenido y no hay overflow horizontal.
+
+### Pendiente
+
+- Sustituir el copy generico de `Programacion` por datos reales si en el futuro se define una tabla o modelo de agenda por evento.
+
+---
+
+## Fase actual: responsive y fluidez de la home - 2026-06-08
+
+### Problema detectado
+
+En `/app`, el layout activaba el modo desktop completo desde `xl` dentro de una pantalla que ya tenia sidebar izquierda fija. En portatiles cercanos a 1280px, la home quedaba con:
+
+- sidebar izquierda de navegacion;
+- sidebar derecha de 390px;
+- contenido principal demasiado estrecho;
+- `Proximos eventos` forzado a tres columnas desde `md`.
+
+Esa combinacion hacia que las cards de eventos quedaran angostas y que titulos/precios se partieran de forma poco legible.
+
+### Ajustes al grid principal
+
+Se cambio el layout de `/app` para que el modo contenido + sidebar derecha solo entre en `2xl`.
+
+Cambios principales:
+
+- El grid principal usa `minmax(0, 1fr)` y `min-w-0` para evitar overflow horizontal.
+- La sidebar derecha baja debajo del contenido en pantallas medianas y portatiles.
+- En `2xl`, la sidebar vuelve a la derecha con ancho menor y comportamiento sticky.
+- La sidebar izquierda del shell reduce ancho/padding en `lg` y recupera el ancho anterior en `xl`.
+- El `main` del shell usa `overflow-x-hidden` como proteccion contra desbordes accidentales.
+
+### Ajustes a Proximos eventos
+
+La seccion `Proximos eventos` dejo de usar `md:grid-cols-3` fijo.
+
+Ahora usa un grid responsive con cards de ancho minimo aproximado de 260px:
+
+- en mobile: una columna;
+- en tablets/portatiles: una o dos columnas segun espacio real;
+- en escritorio amplio: tres columnas cuando el ancho lo permite.
+
+Tambien se ajusto:
+
+- altura de card estable;
+- titulo con `line-clamp-2`;
+- precio y zona con truncado elegante;
+- mantenimiento del hover premium existente.
+
+### Ajustes de scroll y fluidez
+
+Se revisaron efectos visuales que podian penalizar el scroll:
+
+- se elimino `backdrop-blur` del nav mobile;
+- se elimino `backdrop-blur` de los controles del carrusel;
+- se quito la transicion de `filter` y el `blur` en slides inactivos del carrusel;
+- se redujo la escala de imagen inactiva del carrusel;
+- se reemplazaron transiciones genericas por transiciones especificas en controles frecuentes.
+
+Se mantiene `prefers-reduced-motion` ya existente para animaciones globales, progreso de hero y skeletons.
+
+### Que no se toco
+
+No se modifico:
+
+- Supabase;
+- queries de eventos;
+- auth;
+- middleware;
+- roles;
+- RLS;
+- migraciones;
+- datos demo;
+- pagos;
+- Stripe;
+- logica de negocio.
+
+### Como probar
+
+1. Abrir `/app`.
+2. Probar ancho 1366px y confirmar que el contenido principal no queda apretado por la sidebar derecha.
+3. Probar ancho 1280px y confirmar que la sidebar derecha baja debajo del contenido principal.
+4. Probar ancho 1024px y confirmar que no hay overflow horizontal.
+5. Revisar `Proximos eventos` y confirmar que las cards mantienen ancho razonable y texto legible.
+6. Revisar el hero/carrusel y confirmar que controles, texto y CTA no se superponen.
+7. Probar mobile y confirmar que bottom nav, hero, eventos y cards laterales no desbordan.
+8. Hacer scroll por la home y confirmar que se siente mas estable y sin efectos pesados visibles.
+
+---
+
+## Fase actual: optimizacion de scroll y performance visual - 2026-06-08
+
+### Causa probable
+
+La home `/app` mantenia varios costes visuales acumulados:
+
+- imagenes de hero y eventos pintadas como `background-image`, sin `sizes`, `priority` ni lazy loading controlado;
+- varias imagenes del carrusel montadas simultaneamente aunque solo una estuviera visible;
+- sombras grandes repetidas en cards, botones y superficies;
+- animacion de ancho en indicadores del carrusel;
+- secciones inferiores renderizadas y pintadas aunque estuvieran fuera del viewport.
+
+No se encontro `background-attachment: fixed` ni `scroll-behavior: smooth` global activo.
+
+### Optimizaciones aplicadas
+
+Se creo `OptimizedBackdropImage` para usar `next/image` como fondo visual cuando la imagen es local o viene de Supabase local/hosted. Si una URL externa no esta contemplada por Next, mantiene fallback visual con `background-image` para no romper eventos existentes.
+
+Tambien se ajusto `next.config.ts` con `remotePatterns` para:
+
+- Supabase local `127.0.0.1:54321`;
+- Supabase local `localhost:54321`;
+- proyectos `*.supabase.co` en Storage publico.
+
+### Imagenes revisadas
+
+Se actualizaron:
+
+- hero/carrusel de `/app`;
+- cards de `Proximos eventos`.
+
+Cambios:
+
+- `next/image` con `fill`;
+- `sizes` segun viewport;
+- `priority` solo para la primera imagen inicial del carrusel;
+- hover zoom mas leve;
+- fallback conservado para URLs externas no optimizables.
+
+### Animaciones optimizadas
+
+Se mantuvo:
+
+- fade/scale suave del carrusel;
+- barra de progreso del hero;
+- hover premium de cards;
+- respeto a `prefers-reduced-motion`.
+
+Se aligero:
+
+- el carrusel renderiza solo slide activo y vecinos cercanos, no todas las imagenes;
+- el componente del carrusel se memoizo;
+- el indicador activo dejo de animar `width` y usa `transform`;
+- la transicion de imagenes sigue usando `opacity/transform`, no `filter`;
+- el shimmer de skeleton es mas lento para reducir actividad continua.
+
+### CSS ajustado
+
+Se redujeron sombras globales y de hover sin cambiar la estetica:
+
+- `.surface`;
+- botones principales y ghost;
+- cards de accesos rapidos;
+- cards de eventos;
+- estado activo del nav lateral.
+
+Se agrego:
+
+- `content-visibility: auto` en secciones inferiores de `/app`;
+- `contain: layout paint style` en cards donde no afecta el layout.
+
+### Que no se toco
+
+No se modifico:
+
+- Supabase;
+- queries;
+- auth;
+- middleware;
+- roles;
+- RLS;
+- migraciones;
+- pagos;
+- Stripe;
+- rutas;
+- datos demo;
+- textos;
+- estructura general de la UI.
+
+### Como probar manualmente
+
+1. Abrir `/app`.
+2. Hacer scroll rapido arriba y abajo.
+3. Confirmar que el hero conserva imagen, overlay, texto, controles y progreso.
+4. Probar hover en accesos rapidos y `Proximos eventos`.
+5. Confirmar que las imagenes de eventos siguen cargando.
+6. Probar el carrusel manual y automatico.
+7. Probar en pantalla de portatil, especialmente 1280px y 1366px.
+8. Confirmar que no hay overflow horizontal ni saltos visuales al entrar a secciones inferiores.
+
+---
+
+## Fase actual: diagnostico de rendimiento del area privada - 2026-06-08
+
+### Problema detectado
+
+En build local con `npm run start`, login y register ya respondian mejor, pero la navegacion dentro de `/app` seguia sintiendose pesada. La lentitud estaba concentrada en el area privada de usuario y no en toda la aplicacion.
+
+### Causa encontrada
+
+La causa mas probable era una combinacion de trabajo repetido en cada navegacion privada:
+
+- `app/app/layout.tsx` era un Client Component y envolvia todo `/app` con `RoleGate`.
+- `RoleGate` hacia una validacion client-side de Supabase Auth antes de pintar el area privada de usuario.
+- El middleware ya protegia `/app`, por lo que esa validacion cliente duplicaba trabajo y podia retrasar el render inicial del area privada.
+- El middleware usaba la ruta completa de rol para todas las rutas protegidas, incluyendo `/app`, lo que podia consultar `staff_profiles` aunque el area de usuario solo necesita una sesion autenticada.
+- La sidebar, bottom nav y cards visibles de `/app` tenian muchos `Link` internos susceptibles de prefetch automatico, disparando trabajo de rutas privadas que el usuario no habia abierto.
+
+### Cambios en AppShell/layout
+
+`app/app/layout.tsx` volvio a ser Server Component y dejo de envolver `/app` con `RoleGate`. El control real de acceso se mantiene en middleware.
+
+La navegacion de usuario se movio a `UserAppShell`, un wrapper cliente pequeño que importa `userNav` y entrega `role="user"` a `AppShell`. Esto evita pasar iconos/componentes desde Server Components a Client Components y mantiene fuera del layout la validacion client-side duplicada.
+
+En `AppShell` se memoizaron:
+
+- navegacion visible;
+- navegacion segura de fallback;
+- header segun ruta.
+
+Tambien se desactivo el prefetch automatico en la navegacion persistente lateral y movil del area privada.
+
+### Optimizaciones de navegacion
+
+Se agrego `getServerUser` para validar solo sesion autenticada cuando la ruta pertenece a `/app`. Las areas operativas `/admin`, `/guard` y `/storage` siguen usando `getServerUserAndRole`, por lo que continuan consultando rol activo en `staff_profiles`.
+
+Esto evita una consulta de rol innecesaria para rutas normales de usuario sin debilitar la proteccion:
+
+- usuario sin sesion en `/app`: sigue redirigido a `/login`;
+- rutas staff/admin/guard/storage: siguen protegidas por rol;
+- `canRoleAccessPath` sigue siendo la comprobacion final del middleware.
+
+Tambien se desactivo `prefetch` en enlaces internos visibles de la home, carrusel, proximos eventos, Hoy en FLEX y cards de salas VIP para reducir trabajo de fondo durante scroll y navegacion.
+
+### Componentes client reducidos
+
+Se redujo el alcance client del area privada eliminando `RoleGate` del layout de usuario. Los componentes que necesitan interaccion siguen siendo Client Components:
+
+- `UserAppShell`, porque contiene la navegacion con iconos importados en cliente;
+- `AppShell`, por navegacion activa y logout;
+- carrusel de eventos;
+- previews con carga cliente;
+- formularios y vistas interactivas.
+
+No se migraron formularios ni paginas con interaccion a Server Components para evitar cambios de logica.
+
+### Carrusel
+
+No se cambio el diseno del carrusel en esta fase. Se mantuvieron las optimizaciones visuales anteriores y se desactivo el prefetch del CTA `Ver detalles` para que el carrusel no prepare automaticamente la pagina de detalle mientras el usuario solo navega la home.
+
+### CSS
+
+No se agrego un rediseño visual. Se mantienen los ajustes de performance visual previos: menos blur, sombras mas ligeras, transiciones especificas, contencion visual y `next/image` para hero/cards donde aplica.
+
+### Que no se toco
+
+No se modifico:
+
+- Supabase schema;
+- migraciones;
+- RLS;
+- roles;
+- flujo de auth;
+- middleware como proteccion real;
+- pagos;
+- Stripe;
+- consultas de negocio de eventos, VIP, tickets o feed;
+- estructura visual principal de la marca.
+
+### Como probar manualmente
+
+1. Ejecutar `npm run dev` y abrir `/app`.
+2. Navegar entre `/app`, `/app/vip`, `/app/my-turn`, `/app/events` y volver a `/app`.
+3. Confirmar que la sidebar y bottom nav responden sin bloqueo perceptible.
+4. Hacer scroll arriba/abajo en `/app` y probar hover en cards.
+5. Probar el carrusel y abrir `Ver detalles` manualmente.
+6. Ejecutar `npm run build` y luego `npm run start`.
+7. Repetir la navegacion anterior en produccion local.
+8. Confirmar que login/register siguen funcionando y que una sesion no autenticada en `/app` redirige a `/login`.
+
+---
+
+## Ajuste visual del carrusel principal - 2026-06-08
+
+### Problema detectado
+
+Despues de la fase de optimizacion, el carrusel principal de `/app` quedo funcional pero visualmente desbalanceado:
+
+- altura demasiado protagonista en laptop;
+- titulos muy grandes y con cortes poco elegantes;
+- controles con demasiado peso visual;
+- progreso inferior como linea suelta;
+- overlay demasiado plano y oscuro sobre la imagen;
+- demasiado empuje vertical antes de `Accesos rapidos`.
+
+### Cambios de tamaño y jerarquia
+
+Se ajusto `HomeEventCarousel` para mantener el hero como elemento principal sin ocupar tanto alto en pantallas de portatil.
+
+Cambios:
+
+- altura responsive mas contenida en mobile/laptop y mas amplia solo en escritorio grande;
+- skeleton de carga con la misma proporcion del hero final;
+- badge en mayusculas `EVENTO DESTACADO`;
+- titulo con maximo dos lineas, ancho maximo y tamaño responsive mas moderado;
+- `line-height` mas compacto y equilibrado;
+- descripcion limitada a una linea en mobile y dos lineas desde `sm`;
+- CTA mas cerca del contenido para reducir espacio muerto.
+
+### Cambios en controles
+
+Los controles del carrusel se hicieron mas discretos:
+
+- capsula superior mas pequeña y menos opaca;
+- flechas con menor tamaño y menor protagonismo;
+- indicadores mas pequeños;
+- indicador activo animado con `transform`, no con ancho;
+- se mantienen `aria-label`, navegacion manual y autoplay.
+
+### Cambios en progreso
+
+La barra de progreso se integro dentro del hero como una pista redondeada inferior con margen lateral. Sigue reiniciandose al cambiar de slide mediante `key={activeIndex}` y mantiene animacion basada en `transform` a traves de `.hero-progress`.
+
+### Cambios en overlay
+
+El overlay se rebalanceo para conservar legibilidad sin apagar toda la imagen:
+
+- lado izquierdo mas oscuro para texto;
+- centro/derecha mas visible para imagen/artista;
+- degradado inferior mas suave;
+- brillo dorado radial mas sutil;
+- sin filtros pesados.
+
+### Que no se toco
+
+No se modifico:
+
+- Supabase;
+- migraciones;
+- RLS;
+- roles;
+- auth;
+- middleware;
+- queries de eventos;
+- cards de accesos rapidos;
+- Hoy en FLEX;
+- Proximos eventos;
+- sidebar;
+- pagos;
+- Stripe;
+- rutas o datos de imagenes.
+
+### Como probar
+
+1. Abrir `/app` en Google Chrome.
+2. Revisar el carrusel a 1366px y confirmar que no empuja demasiado `Accesos rapidos`.
+3. Revisar a 1280px y 1024px que titulo, controles y CTA no se superponen.
+4. Probar mobile y confirmar que el texto queda legible y sin overflow horizontal.
+5. Probar flechas, indicadores y autoplay.
+6. Confirmar que la imagen sigue visible y el texto mantiene contraste.
+
+### Nota: ajuste visual de controles del carrusel
+
+Se revirtio parcialmente la ubicacion de los controles del carrusel principal: dejan de estar junto al CTA `Ver detalles` y vuelven a la esquina superior derecha del hero. Se conserva una capsula mas sutil, con fondo oscuro translucido, borde fino, flechas discretas, indicador activo dorado claro e indicadores inactivos de baja opacidad.
+
+Se mantuvieron las mejoras de titulo, overlay, progreso inferior y altura responsive. No se modifico autoplay, pausa en hover, datos de eventos, render de slides, Supabase, auth, middleware, roles, RLS, migraciones ni otras secciones de la home.
+
+### Nota: ajuste de indicadores del carrusel
+
+Se ajustaron los puntos indicadores para evitar el cambio fuerte de tamaño del estado activo. Todos mantienen el mismo ancho y alto; el slide activo se diferencia por color dorado claro y opacidad, reduciendo el salto visual al cambiar de evento.
+
+---
+
+## Fase actual: pulido visual del detalle de evento - 2026-06-08
+
+### Problema detectado
+
+La pagina `/app/events/[eventId]` ya cargaba eventos reales y mostraba imagen, titulo, artista, fecha, zona, entradas y enlace del artista, pero la experiencia se sentia incompleta:
+
+- el hero tenia demasiado peso en laptop;
+- el contenido inferior quedaba poco aprovechado;
+- la informacion del evento estaba concentrada en la columna derecha;
+- la descripcion corta no ayudaba a vender la noche;
+- entradas y tiers necesitaban una lectura mas clara.
+
+### Cambios visuales aplicados
+
+Se refino el hero para mantener protagonismo sin ocupar tanto alto:
+
+- altura responsive mas contenida;
+- overlay con lectura clara sin apagar por completo la imagen;
+- badge `Evento destacado` o `Proximo evento`;
+- titulo, artista y descripcion con ancho controlado;
+- degradado dorado sutil para reforzar la estetica FLEX.
+
+Tambien se ajusto el layout general:
+
+- sidebar derecha pasa a modo columna solo en escritorio amplio (`2xl`);
+- en laptop/tablet/mobile baja debajo del contenido para evitar compresion;
+- se agrego `min-w-0` para reducir riesgo de overflow horizontal;
+- cards con hover suave y bordes dorados discretos.
+
+### Secciones nuevas agregadas
+
+Debajo del hero se organizo el contenido en tarjetas:
+
+- `Sobre el evento`: usa la descripcion real si existe. Si es corta, la mantiene y agrega copy editorial de apoyo; si no existe, usa fallback elegante.
+- `Programacion`: muestra apertura, show principal con hora real del evento y DJ set / cierre, sin crear tabla nueva.
+- `Experiencia incluida`: incluye Ambiente premium, Pista principal, Musica en vivo / DJ set y Zonas VIP disponibles con iconos existentes.
+
+### Entradas
+
+La columna de entradas ahora muestra un resumen mas claro:
+
+- `Desde X EUR` cuando hay tiers activos o precio base;
+- tiers reales si existen;
+- disponibilidad por tier cuando hay cupos;
+- mensaje elegante si no hay tiers:
+  `El equipo de FLEX publicara los tipos de entrada disponibles para este evento.`
+
+### Que no se toco
+
+No se modifico:
+
+- Supabase schema;
+- migraciones;
+- RLS;
+- auth;
+- middleware;
+- roles;
+- logica de negocio sensible;
+- pagos;
+- Stripe;
+- `/app` home ni carrusel principal;
+- `/admin/events`;
+- otras secciones de usuario.
+
+### Como probar manualmente
+
+1. Abrir `/app/events/[eventId]` con un evento publicado.
+2. Confirmar que el hero muestra imagen, badge, titulo, artista y descripcion legible.
+3. Revisar que debajo aparecen `Sobre el evento`, `Programacion` y `Experiencia incluida`.
+4. Verificar que la sidebar muestra fecha, zona, artista, entradas, Spotify si existe y `Volver`.
+5. Probar un evento con tiers activos y confirmar que se listan.
+6. Probar un evento sin tiers y confirmar el mensaje elegante.
+7. Revisar laptop/tablet/mobile y confirmar que la sidebar baja debajo del contenido sin overflow horizontal.
+
+### Pendientes
+
+- Modelar una programacion real por evento si en el futuro se decide crear una tabla especifica.
+- Conectar el boton `Seleccionar` a un flujo de compra/reserva cuando pagos y tickets finales esten listos.
+
+---
+
+## Fase actual: pulido visual de Salas VIP - 2026-06-08
+
+### Problema detectado
+
+La pagina `/app/vip` ya leia salas reales desde `club_zones` y mostraba cards premium, pero en laptop podia sentirse pesada e irregular:
+
+- hero superior con demasiado peso visual;
+- cards altas y con padding amplio;
+- jerarquia interna mejorable;
+- Sala Dorada destacaba, pero podia desbalancear la grilla;
+- faltaba una explicacion ligera del proceso de reserva.
+
+### Cambios en hero
+
+Se mantuvo el titulo `Reserva tu espacio privado` y se compacto el bloque superior:
+
+- copy directo: `Elige una sala, reserva tu ambiente y comparte el acceso con tu grupo.`;
+- highlights mas compactos: QR compartido, Hasta 10 invitados y Servicio exclusivo;
+- fondo premium mas sutil, con menos sombra y altura visual mas contenida.
+
+### Cambios en cards
+
+Las cards VIP se hicieron mas compactas y equilibradas:
+
+- altura minima reducida;
+- padding mas contenido;
+- icono y acento superior mas discretos;
+- detalles internos en bloques rectangulares compactos;
+- hover premium mas ligero;
+- grilla a 3 columnas solo en escritorio amplio (`2xl`) y 2 columnas en laptop/tablet cuando cabe.
+
+La jerarquia interna queda organizada como:
+
+- estado `Disponible`;
+- nombre de sala;
+- frase de ambiente;
+- capacidad, planta y precio desde;
+- CTA.
+
+La Sala Dorada mantiene badge `Mas exclusiva` y CTA `Reservar premium`, sin crecer ni romper la grilla.
+
+### Seccion Como funciona
+
+Se agrego una seccion ligera con 3 pasos:
+
+1. Elige tu sala.
+2. Confirma la reserva con el equipo.
+3. Comparte el acceso con tus invitados.
+
+Tambien se agrego microcopy de confianza sobre capacidad limitada para mantener una experiencia comoda y exclusiva.
+
+### Que no se toco
+
+No se modifico:
+
+- `listVipRooms()`;
+- consultas Supabase;
+- filtros `vip_room` / `private_room`;
+- filtro `active=true`;
+- Supabase schema;
+- migraciones;
+- RLS;
+- auth;
+- middleware;
+- roles;
+- pagos;
+- Stripe;
+- flujo real de reserva;
+- `private_room_access`;
+- `/app` home ni carrusel;
+- `/app/events/[eventId]`;
+- `/admin/vip`.
+
+### Como probar manualmente
+
+1. Abrir `/app/vip`.
+2. Confirmar que el hero se ve compacto y mantiene los highlights.
+3. Revisar Sala Negra, Sala Roja y Sala Dorada en desktop/laptop/tablet/mobile.
+4. Confirmar que la Sala Dorada destaca sin desbalancear la grilla.
+5. Verificar que los CTAs navegan al mismo flujo existente de compartir/acceso.
+6. Probar loading, error y empty state si aplica.
+7. Confirmar que no hay overflow horizontal ni cards aplastadas.
+
+### Pendientes
+
+- Conectar reservas reales a `private_room_access` cuando se defina el flujo.
+- Integrar pagos/Stripe en una fase posterior.
+- Validar disponibilidad real por horario si se modela agenda de salas.
+
+---
+
+## Fase actual: pulido visual de Mi turno - 2026-06-08
+
+### Problema detectado
+
+La pagina `/app/my-turn` ya permitia apuntarse a la cola en vivo, pero el contenido se sentia mas informativo que accionable. El estado actual, el formulario y la guia lateral competian visualmente y podian ocupar demasiado espacio en laptop/tablet.
+
+### Cambios en estado actual
+
+Se reforzo la card principal para que el usuario entienda rapido si tiene turno activo:
+
+- estado visible `Sin turno activo` o `Turno activo`;
+- posicion destacada si existe turno;
+- espera estimada y estado de revision;
+- empty state mas humano: `Aun no estas en la lista. Cuando te unas, veremos tu posicion aqui.`;
+- badge `Lista abierta` o `En cola`.
+
+### Cambios en formulario
+
+El formulario se compacto sin cambiar validaciones ni la llamada a `joinLiveQueue()`:
+
+- campos con menos altura y separacion mas ajustada;
+- copy directo: `Completa tus datos para unirte a la lista del escenario.`;
+- CTA mantenido como `Unirme a la lista`;
+- feedback de error, exito y loading conservado;
+- microcopy sobre cambios de orden segun la dinamica de la noche.
+
+### Cambios en guia
+
+La guia `Como funciona` se hizo secundaria y ligera:
+
+1. Te apuntas.
+2. El staff revisa la lista.
+3. Te avisamos cuando estes cerca.
+4. Subes al escenario.
+
+En pantallas intermedias la guia baja debajo del bloque principal para no apretar el formulario.
+
+### Que no se toco
+
+No se modifico:
+
+- `joinLiveQueue()`;
+- consultas Supabase;
+- Supabase schema;
+- migraciones;
+- RLS;
+- auth;
+- middleware;
+- roles;
+- admin;
+- eventos;
+- VIP;
+- home ni carrusel;
+- logica de negocio sensible.
+
+### Como probar manualmente
+
+1. Abrir `/app/my-turn`.
+2. Confirmar que el estado inicial muestra `Sin turno activo` y el mensaje de lista vacia.
+3. Intentar enviar sin nombre artistico y revisar el error existente.
+4. Completar nombre, tipo de participacion e instrumento si aplica.
+5. Enviar y confirmar que aparece posicion y estado activo.
+6. Probar en desktop, laptop, tablet y mobile verificando que no haya overflow horizontal.
+
+### Pendientes
+
+- Sustituir la espera estimada fija por datos reales si se modela tiempo de cola.
+- Mostrar avisos en tiempo real si se incorpora Supabase Realtime para la cola.

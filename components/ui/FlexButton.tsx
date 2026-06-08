@@ -8,10 +8,10 @@ type FlexButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const variants = {
-  primary: "bg-[var(--gold)] text-black shadow-[0_10px_28px_rgba(217,166,64,0.12)] hover:bg-[var(--gold-bright)] hover:shadow-[0_16px_36px_rgba(217,166,64,0.22),0_0_0_1px_rgba(240,194,100,0.18)]",
-  ghost: "border border-white/10 bg-white/[0.03] text-white hover:border-[var(--gold)]/55 hover:bg-[var(--gold)]/8 hover:text-white hover:shadow-[0_12px_30px_rgba(217,166,64,0.08)]",
-  danger: "bg-red-500 text-white hover:bg-red-400 hover:shadow-[0_12px_32px_rgba(239,68,68,0.16)]",
-  success: "bg-green-600 text-white hover:bg-green-500 hover:shadow-[0_12px_32px_rgba(34,197,94,0.14)]"
+  primary: "bg-[var(--gold)] text-black shadow-[0_8px_18px_rgba(217,166,64,0.1)] hover:bg-[var(--gold-bright)] hover:shadow-[0_10px_24px_rgba(217,166,64,0.18)]",
+  ghost: "border border-white/10 bg-white/[0.03] text-white hover:border-[var(--gold)]/55 hover:bg-[var(--gold)]/8 hover:text-white hover:shadow-[0_8px_20px_rgba(217,166,64,0.06)]",
+  danger: "bg-red-500 text-white hover:bg-red-400 hover:shadow-[0_8px_22px_rgba(239,68,68,0.14)]",
+  success: "bg-green-600 text-white hover:bg-green-500 hover:shadow-[0_8px_22px_rgba(34,197,94,0.12)]"
 };
 
 export function FlexButton({ variant = "primary", loading = false, className = "", children, disabled, ...props }: FlexButtonProps) {

@@ -11,7 +11,7 @@ import { listVipRooms, type VipRoom } from "@/lib/flex-actions";
 
 type RoomTheme = {
   eyebrow: string;
-  mood: string;
+  atmosphere: string;
   badges: string[];
   card: string;
   icon: string;
@@ -30,12 +30,12 @@ function roomTheme(room: VipRoom): RoomTheme {
   if (name.includes("dorada") || theme.includes("gold")) {
     return {
       eyebrow: "Lujo privado",
-      mood: "Premium y reservado",
+      atmosphere: "Experiencia premium para grupos exclusivos.",
       badges: ["Premium", "Mas exclusiva"],
-      card: "border-[var(--gold)]/30 bg-[radial-gradient(circle_at_78%_0%,rgba(212,175,55,0.2),transparent_34%),linear-gradient(145deg,rgba(212,175,55,0.1),rgba(255,255,255,0.035)_50%,rgba(0,0,0,0.3))]",
+      card: "border-[var(--gold)]/30 bg-[radial-gradient(circle_at_78%_0%,rgba(212,175,55,0.16),transparent_32%),linear-gradient(145deg,rgba(212,175,55,0.09),rgba(255,255,255,0.03)_52%,rgba(0,0,0,0.26))]",
       icon: "bg-[var(--gold)]/18 text-[var(--gold)] ring-1 ring-[var(--gold)]/30",
       accent: "from-[var(--gold)]/55 via-[var(--gold)]/22 to-transparent",
-      glow: "group-hover:shadow-[0_14px_42px_rgba(212,175,55,0.1)]",
+      glow: "group-hover:shadow-[0_10px_28px_rgba(212,175,55,0.08)]",
       detail: "border-[var(--gold)]/18 bg-[var(--gold)]/[0.055]",
       button: "rounded-full",
       cta: "Reservar premium",
@@ -46,30 +46,30 @@ function roomTheme(room: VipRoom): RoomTheme {
   if (name.includes("roja") || theme.includes("red")) {
     return {
       eyebrow: "Ambiente social",
-      mood: "Energia y conversacion",
+      atmosphere: "Energia social para celebrar.",
       badges: ["Social"],
-      card: "border-red-500/24 bg-[radial-gradient(circle_at_78%_0%,rgba(127,29,29,0.3),transparent_34%),linear-gradient(145deg,rgba(92,15,32,0.18),rgba(255,255,255,0.035)_50%,rgba(0,0,0,0.3))]",
+      card: "border-red-500/22 bg-[radial-gradient(circle_at_78%_0%,rgba(127,29,29,0.24),transparent_32%),linear-gradient(145deg,rgba(92,15,32,0.15),rgba(255,255,255,0.03)_52%,rgba(0,0,0,0.26))]",
       icon: "bg-red-500/14 text-red-200 ring-1 ring-red-300/15",
       accent: "from-red-400/55 via-red-500/22 to-transparent",
-      glow: "group-hover:shadow-[0_14px_42px_rgba(127,29,29,0.12)]",
+      glow: "group-hover:shadow-[0_10px_28px_rgba(127,29,29,0.1)]",
       detail: "border-red-300/12 bg-red-500/[0.045]",
       button: "rounded-full",
-      cta: "Reservar sala",
+      cta: "Ver sala",
       fallbackDescription: "Energia, conversacion y una vista ideal para compartir la noche."
     };
   }
 
   return {
     eyebrow: "Lounge reservado",
-    mood: "Oscura e intima",
+    atmosphere: "Ambiente intimo y reservado.",
     badges: ["Intima"],
-    card: "border-white/12 bg-[radial-gradient(circle_at_78%_0%,rgba(229,231,235,0.11),transparent_34%),linear-gradient(145deg,rgba(0,0,0,0.62),rgba(255,255,255,0.035)_50%,rgba(31,41,55,0.18))]",
+    card: "border-white/12 bg-[radial-gradient(circle_at_78%_0%,rgba(229,231,235,0.09),transparent_32%),linear-gradient(145deg,rgba(0,0,0,0.58),rgba(255,255,255,0.03)_52%,rgba(31,41,55,0.15))]",
     icon: "bg-white/8 text-white ring-1 ring-white/15",
     accent: "from-zinc-200/35 via-zinc-400/14 to-transparent",
-    glow: "group-hover:shadow-[0_14px_42px_rgba(229,231,235,0.07)]",
+    glow: "group-hover:shadow-[0_10px_28px_rgba(229,231,235,0.06)]",
     detail: "border-white/10 bg-white/[0.035]",
     button: "rounded-full",
-    cta: "Reservar sala",
+    cta: "Ver sala",
     fallbackDescription: "Elegante, oscura y discreta para vivir FLEX con mas privacidad."
   };
 }
@@ -85,14 +85,14 @@ function RoomCard({ room }: { room: VipRoom }) {
   const theme = roomTheme(room);
 
   return (
-    <FlexCard className={`group flex min-h-[452px] flex-col overflow-hidden rounded-2xl p-0 transition-[transform,border-color,box-shadow,background-color] duration-500 ease-out hover:-translate-y-0.5 hover:border-white/20 focus-within:border-[var(--gold)]/45 ${theme.glow} ${theme.card}`}>
-      <div className={`h-1.5 bg-gradient-to-r ${theme.accent}`} />
-      <div className="flex flex-1 flex-col p-5 sm:p-6">
+    <FlexCard className={`group flex min-h-[390px] flex-col overflow-hidden rounded-xl p-0 transition-[transform,border-color,box-shadow,background-color] duration-200 ease-out hover:-translate-y-0.5 hover:border-white/20 focus-within:border-[var(--gold)]/45 ${theme.glow} ${theme.card}`}>
+      <div className={`h-1 bg-gradient-to-r ${theme.accent}`} />
+      <div className="flex flex-1 flex-col p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3">
-          <div className={`grid size-12 place-items-center rounded-full transition duration-500 ease-out group-hover:scale-[1.03] ${theme.icon}`}>
-            <Crown size={24} />
+          <div className={`grid size-10 place-items-center rounded-full transition-transform duration-200 ease-out group-hover:scale-[1.03] ${theme.icon}`}>
+            <Crown size={20} />
           </div>
-          <div className="flex min-h-16 max-w-[180px] flex-wrap content-start justify-end gap-2">
+          <div className="flex max-w-[170px] flex-wrap content-start justify-end gap-2">
             <FlexBadge tone="success">Disponible</FlexBadge>
             {theme.badges.map((badge) => (
               <FlexBadge key={badge} tone={badge === "Premium" || badge === "Mas exclusiva" ? "gold" : "neutral"}>
@@ -102,29 +102,29 @@ function RoomCard({ room }: { room: VipRoom }) {
           </div>
         </div>
 
-        <p className="mt-5 text-xs font-bold uppercase tracking-[0.2em] text-[var(--gold)]">{theme.eyebrow}</p>
-        <h2 className="font-display mt-2 text-4xl leading-none text-white">{room.name}</h2>
-        <p className="mt-2 text-sm font-semibold text-white/78">{theme.mood}</p>
-        <p className="mt-3 min-h-16 text-sm leading-6 text-white/68">
+        <p className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-[var(--gold)]">{theme.eyebrow}</p>
+        <h2 className="font-display mt-2 text-3xl leading-none text-white sm:text-4xl">{room.name}</h2>
+        <p className="mt-2 text-sm font-semibold text-white/82">{theme.atmosphere}</p>
+        <p className="mt-2 line-clamp-2 text-sm leading-6 text-white/62">
           {room.description ?? theme.fallbackDescription}
         </p>
 
-        <div className="mt-5 grid gap-2 text-sm text-white/76">
-          <div className={`flex items-center justify-between rounded-full border px-4 py-2.5 ${theme.detail}`}>
+        <div className="mt-4 grid gap-2 text-sm text-white/76">
+          <div className={`flex items-center justify-between rounded-md border px-3 py-2 ${theme.detail}`}>
             <span>Capacidad</span>
             <strong className="text-white">{room.capacity} personas</strong>
           </div>
-          <div className={`flex items-center justify-between rounded-full border px-4 py-2.5 ${theme.detail}`}>
+          <div className={`flex items-center justify-between rounded-md border px-3 py-2 ${theme.detail}`}>
             <span>Planta</span>
             <strong className="text-white">{room.floor}</strong>
           </div>
-          <div className={`flex items-center justify-between rounded-full border px-4 py-2.5 ${theme.detail}`}>
+          <div className={`flex items-center justify-between rounded-md border px-3 py-2 ${theme.detail}`}>
             <span>Precio desde</span>
             <strong className="text-[var(--gold)]">{formatPrice(room.vipPriceCents)}</strong>
           </div>
         </div>
 
-        <Link href={`/app/vip/${room.id}/share`} className="gold-focus mt-auto rounded-full pt-5">
+        <Link href={`/app/vip/${room.id}/share`} prefetch={false} className="gold-focus mt-auto rounded-full pt-4">
           <FlexButton className={`w-full ${theme.button}`}>
             {theme.cta} <ArrowRight className="transition-transform duration-300 ease-out group-hover:translate-x-0.5" size={18} />
           </FlexButton>
@@ -157,29 +157,29 @@ export default function VipPage() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
-      <section className="overflow-hidden rounded-2xl border border-[var(--gold)]/20 bg-[radial-gradient(circle_at_top_right,rgba(212,175,55,0.18),transparent_32%),linear-gradient(135deg,rgba(255,255,255,0.06),rgba(255,255,255,0.025)_46%,rgba(92,15,32,0.18))] p-5 shadow-xl shadow-black/25 sm:p-8">
+    <div className="mx-auto max-w-6xl space-y-6">
+      <section className="overflow-hidden rounded-xl border border-[var(--gold)]/20 bg-[radial-gradient(circle_at_top_right,rgba(212,175,55,0.14),transparent_30%),linear-gradient(135deg,rgba(255,255,255,0.055),rgba(255,255,255,0.025)_48%,rgba(92,15,32,0.15))] p-5 shadow-[0_16px_44px_rgba(0,0,0,0.24)] sm:p-6">
         <div className="max-w-3xl">
           <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.22em] text-[var(--gold)]">
             <Sparkles size={16} /> Salas VIP FLEX
           </p>
-          <h1 className="font-display mt-4 text-5xl leading-none text-white sm:text-6xl">Reserva tu espacio privado</h1>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-white/72">
-            Tres ambientes exclusivos, capacidad limitada y acceso compartido para tus invitados.
+          <h1 className="font-display mt-3 text-5xl leading-none text-white sm:text-6xl">Reserva tu espacio privado</h1>
+          <p className="mt-3 max-w-2xl text-base leading-7 text-white/72">
+            Elige una sala, reserva tu ambiente y comparte el acceso con tu grupo.
           </p>
         </div>
-        <div className="mt-7 flex flex-wrap gap-2">
+        <div className="mt-5 flex flex-wrap gap-2">
           <FlexBadge tone="gold">QR compartido</FlexBadge>
-          <FlexBadge tone="neutral">Maximo 10 personas</FlexBadge>
+          <FlexBadge tone="neutral">Hasta 10 invitados</FlexBadge>
           <FlexBadge tone="neutral">Servicio exclusivo</FlexBadge>
         </div>
       </section>
 
       {loading ? (
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          <FlexSkeleton className="h-[452px] rounded-2xl" />
-          <FlexSkeleton className="h-[452px] rounded-2xl" />
-          <FlexSkeleton className="h-[452px] rounded-2xl" />
+        <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+          <FlexSkeleton className="h-[390px] rounded-xl" />
+          <FlexSkeleton className="h-[390px] rounded-xl" />
+          <FlexSkeleton className="h-[390px] rounded-xl" />
         </div>
       ) : null}
 
@@ -192,18 +192,42 @@ export default function VipPage() {
       {!loading && !error && rooms.length === 0 ? (
         <FlexCard className="text-center">
           <Users className="mx-auto text-[var(--gold)]" size={32} />
-          <h2 className="mt-3 text-xl font-bold text-white">No hay salas VIP activas</h2>
-          <p className="mt-2 text-sm text-[var(--muted)]">Cuando el equipo active nuevas salas privadas, apareceran aqui.</p>
+          <h2 className="mt-3 text-xl font-bold text-white">Aun no hay salas disponibles</h2>
+          <p className="mt-2 text-sm text-[var(--muted)]">Cuando el equipo active una sala VIP, aparecera aqui.</p>
         </FlexCard>
       ) : null}
 
       {!loading && !error && rooms.length > 0 ? (
-        <div className="grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid items-stretch gap-4 md:grid-cols-2 2xl:grid-cols-3">
           {rooms.map((room) => (
             <RoomCard key={room.id} room={room} />
           ))}
         </div>
       ) : null}
+
+      <section className="grid gap-3 rounded-xl border border-white/10 bg-white/[0.025] p-4 sm:grid-cols-3 sm:p-5">
+        {[
+          "Elige tu sala.",
+          "Confirma la reserva con el equipo.",
+          "Comparte el acceso con tus invitados."
+        ].map((step, index) => (
+          <div key={step} className="flex items-start gap-3">
+            <div className="grid size-8 shrink-0 place-items-center rounded-full border border-[var(--gold)]/24 bg-[var(--gold)]/10 text-sm font-bold text-[var(--gold-bright)]">
+              {index + 1}
+            </div>
+            <div>
+              <p className="font-bold text-white">{step}</p>
+              <p className="mt-1 text-sm leading-5 text-[var(--muted)]">
+                {index === 0 ? "Compara ambiente, capacidad y precio." : index === 1 ? "El equipo valida disponibilidad y detalles." : "Usa el acceso compartido para tu grupo."}
+              </p>
+            </div>
+          </div>
+        ))}
+      </section>
+
+      <p className="text-center text-xs font-semibold uppercase tracking-[0.12em] text-white/45">
+        Las salas privadas tienen capacidad limitada para mantener una experiencia comoda y exclusiva.
+      </p>
     </div>
   );
 }

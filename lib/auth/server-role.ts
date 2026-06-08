@@ -8,6 +8,16 @@ export type ServerRoleResult = {
   error: string | null;
 };
 
+export async function getServerUser(supabase: SupabaseClient): Promise<Pick<ServerRoleResult, "user" | "error">> {
+  try {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError) return { user: null, error: userError.message };
+    return { user: userData.user ?? null, error: null };
+  } catch (error) {
+    return { user: null, error: error instanceof Error ? error.message : "No se pudo validar la sesion." };
+  }
+}
+
 export async function getServerUserAndRole(supabase: SupabaseClient): Promise<ServerRoleResult> {
   try {
     const { data: userData, error: userError } = await supabase.auth.getUser();

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { canRoleAccessPath, getServerUserAndRole, isProtectedRoute } from "@/lib/auth/server-role";
+import { canRoleAccessPath, getServerUser, getServerUserAndRole, isProtectedRoute, matchesRoutePrefix } from "@/lib/auth/server-role";
 import { createMiddlewareSupabase } from "@/lib/supabase/server";
 
 function redirectWithCookies(request: NextRequest, response: NextResponse, pathname: string) {
@@ -15,7 +15,10 @@ export async function middleware(request: NextRequest) {
 
   const response = NextResponse.next({ request });
   const supabase = createMiddlewareSupabase(request, response);
-  const { user, role } = await getServerUserAndRole(supabase);
+  const isUserArea = matchesRoutePrefix(pathname, ["/app"]);
+  const { user, role } = isUserArea
+    ? { ...(await getServerUser(supabase)), role: null }
+    : await getServerUserAndRole(supabase);
 
   if (!user) {
     const loginUrl = new URL("/login", request.url);

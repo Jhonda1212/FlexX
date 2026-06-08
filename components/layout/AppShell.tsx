@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Bell, LogOut, Menu } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 import type { NavItem } from "@/lib/types";
@@ -37,9 +37,18 @@ export function AppShell({
   const [roleLoading, setRoleLoading] = useState(staff && !role);
   const [roleError, setRoleError] = useState("");
   const effectiveRole = role ?? resolvedRole;
-  const visibleNav = effectiveRole && effectiveRole !== "admin" ? getNavForRole(effectiveRole) : nav;
-  const safeNav = visibleNav.length > 0 ? visibleNav : getNavForRole("user");
-  const header = routeHeaders[pathname] ?? { title, subtitle };
+  const visibleNav = useMemo(
+    () => effectiveRole && effectiveRole !== "admin" ? getNavForRole(effectiveRole) : nav,
+    [effectiveRole, nav]
+  );
+  const safeNav = useMemo(
+    () => visibleNav.length > 0 ? visibleNav : getNavForRole("user"),
+    [visibleNav]
+  );
+  const header = useMemo(
+    () => routeHeaders[pathname] ?? { title, subtitle },
+    [pathname, routeHeaders, title, subtitle]
+  );
 
   useEffect(() => {
     if (!staff || role) return;
@@ -104,7 +113,7 @@ export function AppShell({
           <h1 className="font-display mt-3 text-4xl text-white">Rol no disponible</h1>
           <p className="mt-3 text-sm text-[var(--muted)]">{roleError || "No hay un rol activo en staff_profiles para esta sesion."}</p>
           <button
-            className="gold-focus mt-6 min-h-12 cursor-pointer rounded-md bg-[var(--gold)] px-5 text-sm font-bold uppercase tracking-[0.08em] text-black transition-[background-color,box-shadow,transform] duration-200 ease-out hover:bg-[var(--gold-bright)] hover:shadow-[0_14px_34px_rgba(217,166,64,0.18)] active:scale-[0.99]"
+            className="gold-focus mt-6 min-h-12 cursor-pointer rounded-md bg-[var(--gold)] px-5 text-sm font-bold uppercase tracking-[0.08em] text-black transition-[background-color,box-shadow,transform] duration-200 ease-out hover:bg-[var(--gold-bright)] hover:shadow-[0_10px_24px_rgba(217,166,64,0.14)] active:scale-[0.99]"
             onClick={() => router.push("/app")}
           >
             Volver a app
@@ -115,8 +124,8 @@ export function AppShell({
   }
 
   return (
-    <div className="min-h-screen pb-24 lg:grid lg:grid-cols-[260px_1fr] lg:pb-0">
-      <aside className="hidden border-r border-white/10 bg-black/45 p-6 lg:flex lg:min-h-screen lg:flex-col">
+    <div className="min-h-screen min-w-0 pb-24 lg:grid lg:grid-cols-[232px_minmax(0,1fr)] lg:pb-0 xl:grid-cols-[260px_minmax(0,1fr)]">
+      <aside className="hidden border-r border-white/10 bg-black/45 p-5 lg:flex lg:min-h-screen lg:flex-col xl:p-6">
         <Logo staff={staff} />
         <nav className="mt-12 space-y-2">
           {safeNav.map((item) => {
@@ -126,10 +135,11 @@ export function AppShell({
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={false}
                 aria-current={active ? "page" : undefined}
                 className={`gold-focus group relative flex min-h-14 cursor-pointer items-center gap-4 rounded-md border px-4 text-sm font-semibold transition-[background-color,border-color,box-shadow,color,transform] duration-200 ease-out active:scale-[0.99] ${
                   active
-                    ? "border-[var(--gold)]/35 bg-[linear-gradient(135deg,rgba(217,166,64,0.18),rgba(255,255,255,0.035))] text-white shadow-[0_12px_32px_rgba(0,0,0,0.22)]"
+                    ? "border-[var(--gold)]/35 bg-[linear-gradient(135deg,rgba(217,166,64,0.18),rgba(255,255,255,0.035))] text-white shadow-[0_8px_22px_rgba(0,0,0,0.18)]"
                     : "border-transparent text-white/78 hover:border-[var(--gold)]/22 hover:bg-[var(--gold)]/8 hover:text-white"
                 }`}
               >
@@ -151,7 +161,7 @@ export function AppShell({
         </div>
       </aside>
 
-      <main className="min-w-0 px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
+      <main className="min-w-0 overflow-x-hidden px-4 py-5 sm:px-6 lg:px-6 lg:py-8 xl:px-8">
         <header className="mb-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <button
@@ -185,7 +195,7 @@ export function AppShell({
         {children}
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-black/92 px-2 py-2 backdrop-blur lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-black/94 px-2 py-2 lg:hidden">
         <div className="grid grid-cols-5 gap-1">
           {safeNav.slice(0, 5).map((item) => {
             const active = pathname === item.href;
@@ -194,6 +204,7 @@ export function AppShell({
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={false}
                 aria-current={active ? "page" : undefined}
                 className={`gold-focus flex h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border text-[11px] font-bold transition-[background-color,border-color,color,transform] duration-200 ease-out active:scale-[0.98] ${
                   active

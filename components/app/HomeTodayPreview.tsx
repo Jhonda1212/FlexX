@@ -66,7 +66,7 @@ export function HomeTodayPreview() {
           <Megaphone className="text-[var(--gold)]" size={20} />
           <h2 className="text-sm font-bold uppercase tracking-[0.08em] text-white">Hoy en FLEX</h2>
         </div>
-        <Link href="/app/today" className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--gold)]">Ver avisos</Link>
+        <Link href="/app/today" prefetch={false} className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--gold)]">Ver avisos</Link>
       </div>
 
       {loading ? (
@@ -88,7 +88,7 @@ export function HomeTodayPreview() {
                 Cuando haya promociones, actividades o avisos aparecerán aquí.
               </p>
             </div>
-            <Link href="/app/today" className="shrink-0">
+            <Link href="/app/today" prefetch={false} className="shrink-0">
               <FlexButton variant="ghost" className="w-full sm:w-auto">Ver avisos</FlexButton>
             </Link>
           </div>
