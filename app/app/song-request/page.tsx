@@ -2,16 +2,17 @@
 
 import { useState } from "react";
 import { AlertCircle, CheckCircle2, Lightbulb, ListChecks, Music, Send, Sparkles } from "lucide-react";
+import { AppPageHeader } from "@/components/app/AppPageHeader";
 import { FlexBadge } from "@/components/ui/FlexBadge";
 import { FlexButton } from "@/components/ui/FlexButton";
 import { FlexCard } from "@/components/ui/FlexCard";
 import { submitSongRequest } from "@/lib/flex-actions";
 
 const steps = [
-  "Envías tu canción.",
+  "Envias tu cancion.",
   "El DJ revisa la solicitud.",
-  "Se prioriza según el ambiente de la noche.",
-  "Si es aprobada, puede sonar durante la sesión."
+  "Se prioriza segun el ambiente de la noche.",
+  "Si es aprobada, puede sonar durante la sesion."
 ];
 
 const fieldClass =
@@ -32,7 +33,7 @@ export default function SongRequestPage() {
     setError("");
 
     if (!title.trim() || !artist.trim() || !genre.trim()) {
-      setError("Completa canción, artista y género.");
+      setError("Completa cancion, artista y genero.");
       return;
     }
 
@@ -47,7 +48,7 @@ export default function SongRequestPage() {
       setDedication("");
       setMessage("Solicitud enviada");
     } else {
-      setError(result.error ?? "No se pudo enviar la canción.");
+      setError(result.error ?? "No se pudo enviar la cancion.");
     }
   }
 
@@ -62,11 +63,12 @@ export default function SongRequestPage() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-lg border border-[var(--gold)]/20 bg-[linear-gradient(135deg,rgba(217,166,64,0.12),rgba(8,8,8,0.94)_52%,rgba(76,18,18,0.18))] p-5 lg:hidden">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--gold)]">FLEX Sounds</p>
-        <h1 className="mt-2 text-3xl font-bold text-white">Pide tu canción</h1>
-        <p className="mt-2 text-sm leading-6 text-white/72">Envía el tema que quieres escuchar esta noche.</p>
-      </div>
+      <AppPageHeader
+        eyebrow="FLEX Sounds"
+        title="Pedir cancion"
+        description="Envia tu tema al DJ y haz parte del ambiente de la noche."
+        className="lg:hidden"
+      />
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         <FlexCard className="overflow-hidden border-[var(--gold)]/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.018))] p-0 shadow-[0_24px_80px_rgba(0,0,0,0.34)]">
@@ -91,7 +93,7 @@ export default function SongRequestPage() {
           <form onSubmit={submit} className="grid gap-5 p-5 sm:p-6">
             <div className="grid gap-4 md:grid-cols-2">
               <label className="grid gap-2 text-sm font-semibold text-white/82">
-                Canción
+                Cancion
                 <input
                   className={fieldClass}
                   placeholder="Nombre del tema"
@@ -112,7 +114,7 @@ export default function SongRequestPage() {
             </div>
 
             <label className="grid gap-2 text-sm font-semibold text-white/82">
-              Género
+              Genero
               <input
                 className={fieldClass}
                 placeholder="Jazz, soul, funk..."
@@ -125,7 +127,7 @@ export default function SongRequestPage() {
               Dedicatoria opcional
               <textarea
                 className={`${fieldClass} min-h-32 resize-none leading-6`}
-                placeholder="Un mensaje breve para acompañar el pedido"
+                placeholder="Un mensaje breve para acompanar el pedido"
                 value={dedication}
                 onChange={(event) => setDedication(event.target.value)}
               />
@@ -140,7 +142,7 @@ export default function SongRequestPage() {
               {message ? (
                 <div className="rounded-md border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-200">
                   <span className="font-bold">Solicitud enviada</span>
-                  <span className="mt-1 block text-green-100/78">El DJ revisará tu pedido durante la sesión.</span>
+                  <span className="mt-1 block text-green-100/78">El DJ revisara tu pedido durante la sesion.</span>
                 </div>
               ) : null}
               {error ? (
@@ -161,8 +163,8 @@ export default function SongRequestPage() {
           <FlexCard className="border-white/10 bg-white/[0.025]">
             <div className="mb-5 flex items-center justify-between gap-4">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--gold)]">Guía rápida</p>
-                <h2 className="mt-1 text-xl font-bold text-white">Cómo funciona</h2>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--gold)]">Guia rapida</p>
+                <h2 className="mt-1 text-xl font-bold text-white">Como funciona</h2>
               </div>
               <ListChecks className="text-[var(--gold)]" size={23} />
             </div>
@@ -187,7 +189,7 @@ export default function SongRequestPage() {
               <div>
                 <h2 className="text-lg font-bold text-white">Consejo FLEX</h2>
                 <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-                  Escribe bien el nombre de la canción y el artista para que el DJ la encuentre más rápido.
+                  Escribe bien el nombre de la cancion y el artista para que el DJ la encuentre mas rapido.
                 </p>
               </div>
             </div>

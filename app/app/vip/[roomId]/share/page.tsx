@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { use, useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import { Card, SectionTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 
-export default function ShareVipPage({ params }: { params: { roomId: string } }) {
+export default function ShareVipPage({ params }: { params: Promise<{ roomId: string }> }) {
+  const { roomId } = use(params);
   const [guestCount, setGuestCount] = useState(0);
   const [message, setMessage] = useState("");
-  const url = `https://flex.app/vip/${params.roomId}/guest?token=demo_private_room_token`;
+  const url = `https://flex.app/vip/${roomId}/guest?token=demo_private_room_token`;
   const full = guestCount >= 10;
 
   async function copyLink() {

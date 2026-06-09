@@ -1,14 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
-  AdminActionButton,
   AdminDataTable,
   AdminEmptyState,
   AdminErrorState,
   AdminLoadingState,
-  AdminPageHeader,
-  StatusBadge
+  AdminPageHeader
 } from "@/components/admin/AdminComponents";
 import { Card, SectionTitle } from "@/components/ui/Card";
 import { FlexBadge } from "@/components/ui/FlexBadge";
@@ -61,7 +60,7 @@ const emptyForm = {
   artist_url: "",
   external_url: "",
   capacity: String(defaultCapacity),
-  ticket_price_cents: "1500",
+  ticket_price: "15.00",
   is_published: false,
   featured: false
 };
@@ -78,8 +77,11 @@ const emptyTierForm = {
   sort_order: "0"
 };
 
-const inputClass = "gold-focus w-full rounded-md border border-white/10 bg-black/40 px-4 py-3 text-white placeholder:text-white/38";
-const labelClass = "text-xs font-bold uppercase tracking-[0.12em] text-[var(--muted)]";
+const inputClass = "gold-focus h-11 w-full rounded-md border border-white/10 bg-black/40 px-3 text-sm text-white placeholder:text-white/35";
+const textareaClass = "gold-focus w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/35";
+const labelClass = "text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--muted)]";
+const helperClass = "text-xs leading-5 text-[var(--muted)]";
+const numberInputCleanClass = "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
 
 function isValidUrl(value: string) {
   if (!value.trim()) return true;
@@ -111,6 +113,76 @@ function formatTierPrice(priceCents: number, currency: string) {
   return `${(priceCents / 100).toFixed(2)} ${currency.toUpperCase()}`;
 }
 
+function centsToPriceInput(priceCents: number) {
+  return (priceCents / 100).toFixed(2);
+}
+
+function priceInputToCents(value: string) {
+  const normalized = value.trim().replace(",", ".");
+  if (!normalized) return defaultTicketPriceCents;
+  const price = Number(normalized);
+  if (!Number.isFinite(price)) return Number.NaN;
+  return Math.round(price * 100);
+}
+
+function compactDate(value: string) {
+  return new Date(value).toLocaleString("es-ES", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function FormGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-lg border border-white/[0.07] bg-white/[0.018] p-3.5">
+      <h3 className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--gold)]">{title}</h3>
+      <div className="mt-3 grid gap-3 md:grid-cols-2">{children}</div>
+    </section>
+  );
+}
+
+function ToggleField({ label, helper, checked, onChange }: { label: string; helper: string; checked: boolean; onChange: (checked: boolean) => void }) {
+  return (
+    <label className="gold-focus flex min-h-11 items-start gap-3 rounded-md border border-white/[0.08] bg-black/20 px-3 py-2.5 transition-colors hover:border-[var(--gold)]/25 hover:bg-white/[0.025]">
+      <input className="mt-1 accent-[var(--gold)]" type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+      <span>
+        <span className="block text-sm font-bold leading-5 text-white">{label}</span>
+        <span className="text-[11px] leading-4 text-[var(--muted)]">{helper}</span>
+      </span>
+    </label>
+  );
+}
+
+function SmallActionButton({
+  children,
+  href,
+  onClick,
+  variant = "ghost",
+  emphasis = false
+}: {
+  children: React.ReactNode;
+  href?: string;
+  onClick?: () => void;
+  variant?: "primary" | "ghost" | "danger" | "success";
+  emphasis?: boolean;
+}) {
+  const variants = {
+    primary: "border-[var(--gold)]/50 bg-[var(--gold)] text-black hover:bg-[var(--gold-bright)]",
+    ghost: "border-white/10 bg-white/[0.025] text-white/82 hover:border-[var(--gold)]/35 hover:bg-[var(--gold)]/8 hover:text-white",
+    danger: "border-red-500/20 bg-red-500/8 text-red-100 hover:border-red-400/35 hover:bg-red-500/14",
+    success: "border-green-500/25 bg-green-500/12 text-green-100 hover:border-green-400/40 hover:bg-green-500/18"
+  };
+  const className = `gold-focus inline-flex h-9 whitespace-nowrap rounded-md border px-3 text-xs font-bold uppercase tracking-[0.06em] transition-[background-color,border-color,color,transform] duration-200 hover:-translate-y-px active:translate-y-0 ${emphasis ? "shadow-[0_8px_18px_rgba(217,166,64,0.1)]" : ""} ${variants[variant]}`;
+
+  if (href) {
+    return <Link href={href} className={`${className} items-center justify-center`}>{children}</Link>;
+  }
+
+  return <button type="button" className={`${className} items-center justify-center`} onClick={onClick}>{children}</button>;
+}
+
 export default function AdminEventsPage() {
   const [events, setEvents] = useState<EventRow[]>([]);
   const [ticketTiers, setTicketTiers] = useState<TicketTierRow[]>([]);
@@ -119,6 +191,7 @@ export default function AdminEventsPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [editingId, setEditingId] = useState("");
   const [editingTierId, setEditingTierId] = useState("");
+  const [formMode, setFormMode] = useState<"closed" | "create" | "edit">("closed");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingTier, setSavingTier] = useState(false);
@@ -134,6 +207,9 @@ export default function AdminEventsPage() {
     () => ticketTiers.filter((tier) => tier.event_id === editingId).sort((a, b) => a.sort_order - b.sort_order || a.price_cents - b.price_cents),
     [editingId, ticketTiers]
   );
+
+  const editingEvent = useMemo(() => events.find((event) => event.id === editingId), [editingId, events]);
+  const isFormOpen = formMode !== "closed";
 
   async function load() {
     setError("");
@@ -171,11 +247,24 @@ export default function AdminEventsPage() {
     setImageFile(null);
     setForm(emptyForm);
     setTierForm(emptyTierForm);
+    setFormMode("closed");
+  }
+
+  function startNewEvent() {
+    setEditingId("");
+    setEditingTierId("");
+    setImageFile(null);
+    setForm(emptyForm);
+    setTierForm(emptyTierForm);
+    setFormMode("create");
   }
 
   function editEvent(event: EventRow) {
     setEditingId(event.id);
+    setEditingTierId("");
     setImageFile(null);
+    setTierForm(emptyTierForm);
+    setFormMode("edit");
     setForm({
       title: event.title,
       artist_name: event.artist_name ?? "",
@@ -187,7 +276,7 @@ export default function AdminEventsPage() {
       artist_url: event.artist_url ?? "",
       external_url: event.external_url ?? "",
       capacity: String(event.capacity),
-      ticket_price_cents: String(event.ticket_price_cents),
+      ticket_price: centsToPriceInput(event.ticket_price_cents),
       is_published: event.is_published,
       featured: event.featured
     });
@@ -212,7 +301,7 @@ export default function AdminEventsPage() {
     setMessage("");
 
     if (!form.title.trim() || !form.starts_at) {
-      setError("Titulo y fecha de inicio son obligatorios.");
+      setError("Completa titulo e inicio.");
       return;
     }
     if (!isValidUrl(form.artist_url)) {
@@ -229,13 +318,13 @@ export default function AdminEventsPage() {
     }
 
     const capacity = form.capacity.trim() ? Number(form.capacity) : defaultCapacity;
-    const ticketPriceCents = form.ticket_price_cents.trim() ? Number(form.ticket_price_cents) : defaultTicketPriceCents;
+    const ticketPriceCents = priceInputToCents(form.ticket_price);
     if (!Number.isFinite(capacity) || capacity <= 0) {
       setError("La capacidad debe ser mayor que 0.");
       return;
     }
     if (!Number.isFinite(ticketPriceCents) || ticketPriceCents < 0) {
-      setError("El precio de entrada no puede ser negativo.");
+      setError("El precio desde no puede ser negativo.");
       return;
     }
 
@@ -389,142 +478,203 @@ export default function AdminEventsPage() {
 
   return (
     <div className="space-y-5">
-      <AdminPageHeader title="Eventos" description="Crea eventos con imagen, artista, Spotify y destacado para la home." />
+      <AdminPageHeader
+        title="Eventos"
+        description="Crea, publica y gestiona los eventos que apareceran en la app de usuarios."
+        action={<FlexButton className="h-10 min-h-0 whitespace-nowrap px-4 text-xs tracking-[0.06em]" onClick={startNewEvent}>Nuevo evento</FlexButton>}
+      />
       {loading ? <AdminLoadingState /> : null}
       {error ? <AdminErrorState message={error} /> : null}
       {message ? <Card className="border-green-500/30 bg-green-500/10"><p className="text-green-200">{message}</p></Card> : null}
 
-      <Card className="border-[var(--gold)]/20 bg-[var(--gold)]/8">
-        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_260px] md:items-center">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--gold)]">Publicacion en home</p>
-            <p className="mt-2 text-sm leading-6 text-white/72">
-              Para aparecer en Proximos eventos, el evento debe estar publicado y tener una fecha de inicio futura. Los destacados se muestran primero.
-            </p>
+      {!loading && !error && events.length === 0 ? <AdminEmptyState title="Sin eventos" description="Crea el primer evento de FLEX." /> : null}
+      {events.length ? (
+        <Card className="p-4">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <SectionTitle title="Eventos existentes" />
+            {!isFormOpen ? <SmallActionButton onClick={startNewEvent}>Nuevo evento</SmallActionButton> : null}
           </div>
-          <div className="rounded-md border border-white/10 bg-black/25 p-3 text-xs leading-5 text-[var(--muted)]">
-            Imagen por subida a <span className="font-bold text-white">event-images</span> o ruta manual en <span className="font-bold text-white">image_url</span>.
-          </div>
-        </div>
-      </Card>
+          <AdminDataTable columns={["Imagen", "Evento", "Fecha", "Precio", "Estado", "Acciones"]}>
+            {events.map((event) => {
+              const appearsInHome = event.is_published && isFutureEvent(event);
+              const activeTiers = ticketTiers.filter((tier) => tier.event_id === event.id && tier.active).sort((a, b) => a.price_cents - b.price_cents);
+              const priceLabel = activeTiers[0]
+                ? `Desde ${formatTierPrice(activeTiers[0].price_cents, activeTiers[0].currency)}`
+                : cents(event.ticket_price_cents);
+              const eventImage = event.image_url || event.cover_image_path || "/images/events/john-coltrane.jpg";
+              return (
+                <tr key={event.id} className="text-white transition-colors hover:bg-white/[0.025]">
+                  <td className="px-3 py-2.5">
+                    <div className="size-11 rounded-md bg-cover bg-center ring-1 ring-white/10" style={{ backgroundImage: `url(${eventImage})` }} />
+                  </td>
+                  <td className="min-w-[220px] px-3 py-2.5">
+                    <div className="line-clamp-2 max-w-[320px] font-bold leading-5">{event.title}</div>
+                    <div className="mt-1 text-xs text-[var(--muted)]">{event.artist_name || "Sin artista"} / {event.zone_name || "Sin zona"}</div>
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-sm">{compactDate(event.starts_at)}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-sm font-semibold text-[var(--gold-bright)]">{priceLabel}</td>
+                  <td className="px-3 py-2.5">
+                    <div className="flex flex-wrap gap-1.5">
+                      {event.is_published ? <FlexBadge tone="success">Publicado</FlexBadge> : <FlexBadge tone="gold">Borrador</FlexBadge>}
+                      {event.featured ? <FlexBadge tone="gold">Destacado</FlexBadge> : null}
+                      {appearsInHome ? <FlexBadge tone="success">Visible home</FlexBadge> : null}
+                    </div>
+                  </td>
+                  <td className="min-w-[250px] px-3 py-2.5">
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                      <SmallActionButton variant="primary" emphasis onClick={() => editEvent(event)}>Editar</SmallActionButton>
+                      {event.is_published ? <SmallActionButton variant="ghost" href={`/app/events/${event.id}`}>Ver</SmallActionButton> : null}
+                      <SmallActionButton variant="ghost" onClick={() => updateFlags(event.id, { featured: !event.featured })}>{event.featured ? "Quitar destacado" : "Destacar"}</SmallActionButton>
+                      <SmallActionButton variant={event.is_published ? "danger" : "success"} onClick={() => updateFlags(event.id, { is_published: !event.is_published })}>{event.is_published ? "Despublicar" : "Publicar"}</SmallActionButton>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </AdminDataTable>
+        </Card>
+      ) : null}
 
-      <Card>
-        <SectionTitle title={editingId ? "Editar evento" : "Crear evento"} />
-        <form onSubmit={saveEvent} className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="grid gap-2">
-              <span className={labelClass}>Titulo *</span>
-              <input required className={inputClass} placeholder="Jazz Nights" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
-            </label>
-            <label className="grid gap-2">
-              <span className={labelClass}>Artista</span>
-              <input className={inputClass} placeholder="John Coltrane" value={form.artist_name} onChange={(event) => setForm({ ...form, artist_name: event.target.value })} />
-            </label>
-            <label className="grid gap-2">
-              <span className={labelClass}>Inicio *</span>
-              <input required type="datetime-local" className={inputClass} value={form.starts_at} onChange={(event) => setForm({ ...form, starts_at: event.target.value })} />
-            </label>
-            <label className="grid gap-2">
-              <span className={labelClass}>Fin opcional</span>
-              <input type="datetime-local" className={inputClass} value={form.ends_at} onChange={(event) => setForm({ ...form, ends_at: event.target.value })} />
-            </label>
-            <label className="grid gap-2">
-              <span className={labelClass}>Zona</span>
-              <input className={inputClass} placeholder="Pista principal" value={form.zone_name} onChange={(event) => setForm({ ...form, zone_name: event.target.value })} />
-            </label>
-            <label className="grid gap-2">
-              <span className={labelClass}>Link artista</span>
-              <input className={inputClass} placeholder="https://open.spotify.com/..." value={form.artist_url} onChange={(event) => setForm({ ...form, artist_url: event.target.value })} />
-            </label>
-            <label className="grid gap-2 md:col-span-2">
-              <span className={labelClass}>Link externo opcional</span>
-              <input className={inputClass} placeholder="https://..." value={form.external_url} onChange={(event) => setForm({ ...form, external_url: event.target.value })} />
-            </label>
-            <label className="grid gap-2 md:col-span-2">
-              <span className={labelClass}>Descripcion</span>
-              <textarea className={`${inputClass} min-h-24 resize-y`} placeholder="Descripcion corta para la card y el detalle." value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
-            </label>
-            <label className="grid gap-2">
-              <span className={labelClass}>Capacidad opcional</span>
-              <input type="number" min={1} className={inputClass} placeholder={String(defaultCapacity)} value={form.capacity} onChange={(event) => setForm({ ...form, capacity: event.target.value })} />
-            </label>
-            <label className="grid gap-2">
-              <span className={labelClass}>Precio cents opcional</span>
-              <input type="number" min={0} className={inputClass} placeholder="1500" value={form.ticket_price_cents} onChange={(event) => setForm({ ...form, ticket_price_cents: event.target.value })} />
-            </label>
-            <label className="gold-focus flex min-h-12 items-center gap-3 rounded-md border border-white/10 bg-white/[0.025] px-4 text-sm font-bold text-white">
-              <input type="checkbox" checked={form.is_published} onChange={(event) => setForm({ ...form, is_published: event.target.checked })} />
-              Publicado
-            </label>
-            <label className="gold-focus flex min-h-12 items-center gap-3 rounded-md border border-white/10 bg-white/[0.025] px-4 text-sm font-bold text-white">
-              <input type="checkbox" checked={form.featured} onChange={(event) => setForm({ ...form, featured: event.target.checked })} />
-              Destacar en home
-            </label>
-            <div className="flex flex-wrap gap-3 md:col-span-2 md:justify-end">
-              {editingId ? <AdminActionButton variant="ghost" onClick={resetForm}>Cancelar</AdminActionButton> : null}
-              <FlexButton disabled={saving}>{saving ? "Guardando" : editingId ? "Guardar cambios" : "Crear evento"}</FlexButton>
-            </div>
-          </div>
-
-          <aside className="rounded-lg border border-white/10 bg-black/25 p-4">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--gold)]">Imagen</p>
-            <div className="mt-3 overflow-hidden rounded-md border border-white/10 bg-white/[0.03]">
-              {imagePreview ? (
-                <div className="h-40 bg-cover bg-center" style={{ backgroundImage: `url(${imagePreview})` }} />
+      {isFormOpen ? (
+        <Card className="border-[var(--gold)]/12 bg-white/[0.025] p-4">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <SectionTitle title={formMode === "edit" ? "Editando evento" : "Crear evento"} />
+              {formMode === "edit" ? (
+                <p className="-mt-2 text-sm text-[var(--muted)]">
+                  {editingEvent?.title ?? "Evento seleccionado"} esta cargado en el formulario.
+                </p>
               ) : (
-                <div className="grid h-40 place-items-center px-4 text-center text-sm text-[var(--muted)]">Imagen opcional recomendada</div>
+                <p className="-mt-2 text-sm text-[var(--muted)]">Completa los datos principales y publica cuando este listo.</p>
               )}
             </div>
-            <input className="gold-focus mt-3 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white" type="file" accept="image/*" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} />
-            <input className="gold-focus mt-3 w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/38" placeholder="O pega image_url" value={form.image_url} onChange={(event) => { setImageFile(null); setForm({ ...form, image_url: event.target.value }); }} />
-            <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
-              Las subidas usan el bucket publico `event-images`. Tambien puedes usar una URL absoluta o una ruta local como `/images/events/john-coltrane.jpg`.
-            </p>
-          </aside>
-        </form>
-      </Card>
+            <SmallActionButton onClick={resetForm}>{formMode === "edit" ? "Cancelar edicion" : "Cerrar formulario"}</SmallActionButton>
+          </div>
 
-      <Card>
-        <SectionTitle title="Precios por zona" />
+          <form onSubmit={saveEvent} className="space-y-3.5">
+            <FormGroup title="Informacion">
+              <label className="grid gap-2">
+                <span className={labelClass}>Titulo *</span>
+                <input required className={inputClass} placeholder="Jazz Nights" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
+              </label>
+              <label className="grid gap-2">
+                <span className={labelClass}>Artista</span>
+                <input className={inputClass} placeholder="John Coltrane" value={form.artist_name} onChange={(event) => setForm({ ...form, artist_name: event.target.value })} />
+              </label>
+              <label className="grid gap-2">
+                <span className={labelClass}>Inicio *</span>
+                <input required type="datetime-local" className={inputClass} value={form.starts_at} onChange={(event) => setForm({ ...form, starts_at: event.target.value })} />
+              </label>
+              <label className="grid gap-2">
+                <span className={labelClass}>Fin opcional</span>
+                <input type="datetime-local" className={inputClass} value={form.ends_at} onChange={(event) => setForm({ ...form, ends_at: event.target.value })} />
+              </label>
+              <label className="grid gap-2">
+                <span className={labelClass}>Zona</span>
+                <input className={inputClass} placeholder="Pista principal" value={form.zone_name} onChange={(event) => setForm({ ...form, zone_name: event.target.value })} />
+              </label>
+              <label className="grid gap-2 md:col-span-2">
+                <span className={labelClass}>Descripcion</span>
+                <textarea className={`${textareaClass} min-h-20 resize-y`} placeholder="Descripcion corta para la card y el detalle." value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
+              </label>
+            </FormGroup>
+
+            <FormGroup title="Imagen y enlaces">
+              <div className="md:col-span-2">
+                <div className="grid gap-3 lg:grid-cols-[180px_minmax(0,1fr)]">
+                  <div className="overflow-hidden rounded-md border border-white/[0.08] bg-black/30">
+                    {imagePreview ? (
+                      <div className="h-32 bg-cover bg-center" style={{ backgroundImage: `url(${imagePreview})` }} />
+                    ) : (
+                      <div className="grid h-32 place-items-center px-4 text-center text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Imagen recomendada</div>
+                    )}
+                  </div>
+                  <div className="grid content-start gap-3">
+                    <p className="text-sm leading-5 text-[var(--muted)]">Sube una imagen del artista o pega una URL.</p>
+                    <input className="gold-focus h-10 w-full rounded-md border border-white/10 bg-black/35 px-3 py-1.5 text-xs text-white file:mr-3 file:rounded-md file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-white hover:file:bg-[var(--gold)] hover:file:text-black" type="file" accept="image/*" onChange={(event) => setImageFile(event.target.files?.[0] ?? null)} />
+                    <input className={inputClass} placeholder="O pega image_url" value={form.image_url} onChange={(event) => { setImageFile(null); setForm({ ...form, image_url: event.target.value }); }} />
+                  </div>
+                </div>
+              </div>
+              <label className="grid gap-2">
+                <span className={labelClass}>Link artista</span>
+                <input className={inputClass} placeholder="https://open.spotify.com/..." value={form.artist_url} onChange={(event) => setForm({ ...form, artist_url: event.target.value })} />
+              </label>
+              <label className="grid gap-2">
+                <span className={labelClass}>Link externo opcional</span>
+                <input className={inputClass} placeholder="https://..." value={form.external_url} onChange={(event) => setForm({ ...form, external_url: event.target.value })} />
+              </label>
+            </FormGroup>
+
+            <FormGroup title="Publicacion y precio">
+              <label className="grid gap-2">
+                <span className={labelClass}>Capacidad opcional</span>
+                <input type="number" min={1} className={`${inputClass} ${numberInputCleanClass}`} placeholder={String(defaultCapacity)} value={form.capacity} onChange={(event) => setForm({ ...form, capacity: event.target.value })} />
+              </label>
+              <label className="grid gap-2">
+                <span className={labelClass}>Precio desde</span>
+                <div className="flex h-11 overflow-hidden rounded-md border border-[var(--gold)]/18 bg-black/35 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] focus-within:border-[var(--gold)]/55">
+                  <input type="number" min={0} step="0.01" className={`w-full bg-transparent px-3 text-sm font-semibold text-white outline-none placeholder:text-white/35 ${numberInputCleanClass}`} placeholder="15.00" value={form.ticket_price} onChange={(event) => setForm({ ...form, ticket_price: event.target.value })} />
+                  <span className="grid place-items-center border-l border-white/10 px-3 text-xs font-bold text-[var(--gold)]">EUR</span>
+                </div>
+                <span className="text-[11px] leading-4 text-[var(--muted)]">Se guarda internamente en centavos.</span>
+              </label>
+              <ToggleField label="Publicado" helper="Visible para usuarios." checked={form.is_published} onChange={(checked) => setForm({ ...form, is_published: checked })} />
+              <ToggleField label="Destacar en home" helper="Puede aparecer en el carrusel principal." checked={form.featured} onChange={(checked) => setForm({ ...form, featured: checked })} />
+              <div className="flex items-end justify-end md:col-span-2">
+                <FlexButton className="h-10 min-h-0 whitespace-nowrap px-5 text-xs tracking-[0.06em]" disabled={saving}>
+                  {saving ? "Guardando" : formMode === "edit" ? "Guardar cambios" : "Crear evento"}
+                </FlexButton>
+              </div>
+            </FormGroup>
+          </form>
+        </Card>
+      ) : null}
+
+      <Card className={!editingId ? "py-3.5" : "p-4"}>
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <SectionTitle title="Entradas por zona" />
+            {!editingId ? <p className="-mt-2 text-sm text-[var(--muted)]">Selecciona o edita un evento para gestionar sus precios.</p> : null}
+            {editingId ? <p className="-mt-2 text-sm text-[var(--muted)]">Gestiona entradas del evento seleccionado.</p> : null}
+          </div>
+        </div>
         {!editingId ? (
-          <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-            <p className="font-bold text-white">Guarda o edita un evento para gestionar sus entradas.</p>
-            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-              Los precios por zona se agregan sobre un evento existente y luego aparecen en /app cuando el evento esta publicado y en fecha futura.
-            </p>
+          <div className="rounded-md border border-white/[0.07] bg-white/[0.018] px-3 py-2.5">
+            <p className="text-sm font-bold text-white">Selecciona o edita un evento para gestionar sus precios.</p>
           </div>
         ) : (
-          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
             <div className="space-y-3">
               {tiersForEditingEvent.length ? (
                 tiersForEditingEvent.map((tier) => (
-                  <div key={tier.id} className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                  <div key={tier.id} className="rounded-lg border border-white/[0.08] bg-white/[0.018] p-3 transition-colors hover:border-[var(--gold)]/18 hover:bg-white/[0.025]">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <div className="font-bold text-white">{tier.name}</div>
-                        <div className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-[var(--gold)]">{tier.zone_name || "Sin zona"}</div>
+                        <div className="mt-1 text-xs font-bold uppercase tracking-[0.1em] text-[var(--gold)]">{tier.zone_name || "Sin zona"}</div>
                       </div>
                       <div className="text-right">
                         <div className="font-bold text-white">{formatTierPrice(tier.price_cents, tier.currency)}</div>
                         <div className="mt-1">{tier.active ? <FlexBadge tone="success">Activo</FlexBadge> : <FlexBadge>Inactivo</FlexBadge>}</div>
                       </div>
                     </div>
-                    {tier.description ? <p className="mt-3 text-sm leading-6 text-white/68">{tier.description}</p> : null}
-                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-[var(--muted)]">
+                    {tier.description ? <p className="mt-2 text-sm leading-6 text-white/68">{tier.description}</p> : null}
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-[var(--muted)]">
                       <span>
-                        Capacidad {tier.capacity ?? "-"} · Disponibles {tier.available_quantity ?? "-"} · Orden {tier.sort_order}
+                        Capacidad {tier.capacity ?? "-"} / Disponibles {tier.available_quantity ?? "-"} / Orden {tier.sort_order}
                       </span>
-                      <div className="flex flex-wrap gap-2">
-                        <AdminActionButton variant="ghost" onClick={() => editTier(tier)}>Editar</AdminActionButton>
-                        <AdminActionButton variant={tier.active ? "danger" : "success"} onClick={() => toggleTierActive(tier)}>
+                      <div className="flex flex-wrap gap-1.5">
+                        <SmallActionButton onClick={() => editTier(tier)}>Editar</SmallActionButton>
+                        <SmallActionButton variant={tier.active ? "danger" : "success"} onClick={() => toggleTierActive(tier)}>
                           {tier.active ? "Desactivar" : "Activar"}
-                        </AdminActionButton>
+                        </SmallActionButton>
                       </div>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
+                <div className="rounded-lg border border-white/[0.08] bg-white/[0.018] p-3.5">
                   <p className="font-bold text-white">Sin precios por zona</p>
                   <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
                     Agrega General, Pista principal, VIP Lounge u otro tipo de entrada para este evento.
@@ -533,9 +683,9 @@ export default function AdminEventsPage() {
               )}
             </div>
 
-            <form onSubmit={saveTier} className="rounded-lg border border-[var(--gold)]/18 bg-black/25 p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--gold)]">{editingTierId ? "Editar precio" : "Nuevo precio"}</p>
-              <div className="mt-4 grid gap-3">
+            <form onSubmit={saveTier} className="rounded-lg border border-[var(--gold)]/14 bg-black/22 p-3.5">
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--gold)]">{editingTierId ? "Editar precio" : "Nuevo precio"}</p>
+              <div className="mt-3 grid gap-3">
                 <label className="grid gap-2">
                   <span className={labelClass}>Nombre *</span>
                   <input required className={inputClass} placeholder="General" value={tierForm.name} onChange={(event) => setTierForm({ ...tierForm, name: event.target.value })} />
@@ -546,12 +696,12 @@ export default function AdminEventsPage() {
                 </label>
                 <label className="grid gap-2">
                   <span className={labelClass}>Descripcion</span>
-                  <textarea className={`${inputClass} min-h-20 resize-y`} placeholder="Acceso a zona principal." value={tierForm.description} onChange={(event) => setTierForm({ ...tierForm, description: event.target.value })} />
+                  <textarea className={`${textareaClass} min-h-20 resize-y`} placeholder="Acceso a zona principal." value={tierForm.description} onChange={(event) => setTierForm({ ...tierForm, description: event.target.value })} />
                 </label>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="grid gap-2">
                     <span className={labelClass}>Precio cents *</span>
-                    <input required type="number" min={0} className={inputClass} placeholder="2000" value={tierForm.price_cents} onChange={(event) => setTierForm({ ...tierForm, price_cents: event.target.value })} />
+                    <input required type="number" min={0} className={`${inputClass} ${numberInputCleanClass}`} placeholder="2000" value={tierForm.price_cents} onChange={(event) => setTierForm({ ...tierForm, price_cents: event.target.value })} />
                   </label>
                   <label className="grid gap-2">
                     <span className={labelClass}>Moneda</span>
@@ -561,73 +711,29 @@ export default function AdminEventsPage() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="grid gap-2">
                     <span className={labelClass}>Capacidad</span>
-                    <input type="number" min={0} className={inputClass} placeholder="400" value={tierForm.capacity} onChange={(event) => setTierForm({ ...tierForm, capacity: event.target.value })} />
+                    <input type="number" min={0} className={`${inputClass} ${numberInputCleanClass}`} placeholder="400" value={tierForm.capacity} onChange={(event) => setTierForm({ ...tierForm, capacity: event.target.value })} />
                   </label>
                   <label className="grid gap-2">
                     <span className={labelClass}>Disponibles</span>
-                    <input type="number" min={0} className={inputClass} placeholder="120" value={tierForm.available_quantity} onChange={(event) => setTierForm({ ...tierForm, available_quantity: event.target.value })} />
+                    <input type="number" min={0} className={`${inputClass} ${numberInputCleanClass}`} placeholder="120" value={tierForm.available_quantity} onChange={(event) => setTierForm({ ...tierForm, available_quantity: event.target.value })} />
                   </label>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="grid gap-2">
                     <span className={labelClass}>Orden</span>
-                    <input type="number" className={inputClass} placeholder="0" value={tierForm.sort_order} onChange={(event) => setTierForm({ ...tierForm, sort_order: event.target.value })} />
+                    <input type="number" className={`${inputClass} ${numberInputCleanClass}`} placeholder="0" value={tierForm.sort_order} onChange={(event) => setTierForm({ ...tierForm, sort_order: event.target.value })} />
                   </label>
-                  <label className="gold-focus flex min-h-12 items-center gap-3 rounded-md border border-white/10 bg-white/[0.025] px-4 text-sm font-bold text-white">
-                    <input type="checkbox" checked={tierForm.active} onChange={(event) => setTierForm({ ...tierForm, active: event.target.checked })} />
-                    Activo
-                  </label>
+                  <ToggleField label="Activo" helper="Disponible para venta." checked={tierForm.active} onChange={(checked) => setTierForm({ ...tierForm, active: checked })} />
                 </div>
-                <div className="flex flex-wrap justify-end gap-3">
-                  {editingTierId ? <AdminActionButton variant="ghost" onClick={resetTierForm}>Cancelar</AdminActionButton> : null}
-                  <FlexButton disabled={savingTier}>{savingTier ? "Guardando" : editingTierId ? "Guardar precio" : "Agregar precio"}</FlexButton>
+                <div className="flex flex-wrap justify-end gap-2">
+                  {editingTierId ? <SmallActionButton onClick={resetTierForm}>Cancelar</SmallActionButton> : null}
+                  <FlexButton className="h-10 min-h-0 whitespace-nowrap px-5 text-xs tracking-[0.06em]" disabled={savingTier}>{savingTier ? "Guardando" : editingTierId ? "Guardar precio" : "Agregar precio"}</FlexButton>
                 </div>
               </div>
             </form>
           </div>
         )}
       </Card>
-
-      {!loading && !error && events.length === 0 ? <AdminEmptyState title="Sin eventos" description="Crea el primer evento de FLEX." /> : null}
-      {events.length ? (
-        <AdminDataTable columns={["Evento", "Fecha", "Imagen", "Precio", "Estado", "Acciones"]}>
-          {events.map((event) => {
-            const appearsInHome = event.is_published && isFutureEvent(event);
-            const activeTiers = ticketTiers.filter((tier) => tier.event_id === event.id && tier.active).sort((a, b) => a.price_cents - b.price_cents);
-            const priceLabel = activeTiers[0]
-              ? `Desde ${formatTierPrice(activeTiers[0].price_cents, activeTiers[0].currency)}`
-              : cents(event.ticket_price_cents);
-            return (
-              <tr key={event.id} className="text-white">
-                <td className="px-4 py-3">
-                  <div className="font-bold">{event.title}</div>
-                  <div className="text-xs text-[var(--muted)]">{event.artist_name || "Sin artista"} - {event.zone_name || "Sin zona"}</div>
-                </td>
-                <td className="px-4 py-3">{new Date(event.starts_at).toLocaleString("es-ES")}</td>
-                <td className="px-4 py-3">
-                  <div className="size-14 rounded-md bg-cover bg-center ring-1 ring-white/10" style={{ backgroundImage: `url(${event.image_url || event.cover_image_path || "/images/events/john-coltrane.jpg"})` }} />
-                </td>
-                <td className="px-4 py-3">{priceLabel}</td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-col gap-2">
-                    <StatusBadge status={event.is_published ? "published" : "draft"} />
-                    {event.featured ? <FlexBadge tone="gold">Destacado</FlexBadge> : null}
-                    {appearsInHome ? <FlexBadge tone="success">Visible home</FlexBadge> : null}
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap gap-2">
-                    <AdminActionButton variant="ghost" onClick={() => editEvent(event)}>Editar</AdminActionButton>
-                    <AdminActionButton variant={event.is_published ? "danger" : "success"} onClick={() => updateFlags(event.id, { is_published: !event.is_published })}>{event.is_published ? "Despublicar" : "Publicar"}</AdminActionButton>
-                    <AdminActionButton variant="ghost" onClick={() => updateFlags(event.id, { featured: !event.featured })}>{event.featured ? "Quitar destacado" : "Destacar"}</AdminActionButton>
-                    {event.is_published ? <AdminActionButton variant="ghost" href={`/app/events/${event.id}`}>Ver</AdminActionButton> : null}
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-        </AdminDataTable>
-      ) : null}
     </div>
   );
 }

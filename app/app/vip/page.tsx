@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Crown, Sparkles, Users } from "lucide-react";
+import { ArrowRight, Crown, Users } from "lucide-react";
+import { AppEmptyState } from "@/components/app/AppEmptyState";
+import { AppPageHeader } from "@/components/app/AppPageHeader";
 import { FlexBadge } from "@/components/ui/FlexBadge";
 import { FlexButton } from "@/components/ui/FlexButton";
 import { FlexCard } from "@/components/ui/FlexCard";
@@ -158,22 +160,18 @@ export default function VipPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <section className="overflow-hidden rounded-xl border border-[var(--gold)]/20 bg-[radial-gradient(circle_at_top_right,rgba(212,175,55,0.14),transparent_30%),linear-gradient(135deg,rgba(255,255,255,0.055),rgba(255,255,255,0.025)_48%,rgba(92,15,32,0.15))] p-5 shadow-[0_16px_44px_rgba(0,0,0,0.24)] sm:p-6">
-        <div className="max-w-3xl">
-          <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.22em] text-[var(--gold)]">
-            <Sparkles size={16} /> Salas VIP FLEX
-          </p>
-          <h1 className="font-display mt-3 text-5xl leading-none text-white sm:text-6xl">Reserva tu espacio privado</h1>
-          <p className="mt-3 max-w-2xl text-base leading-7 text-white/72">
-            Elige una sala, reserva tu ambiente y comparte el acceso con tu grupo.
-          </p>
-        </div>
-        <div className="mt-5 flex flex-wrap gap-2">
+      <AppPageHeader
+        eyebrow="Salas VIP FLEX"
+        title="Salas VIP"
+        description="Reserva un espacio privado para compartir la noche con tu grupo."
+        actions={
+          <div className="flex flex-wrap gap-2 sm:max-w-sm sm:justify-end">
           <FlexBadge tone="gold">QR compartido</FlexBadge>
           <FlexBadge tone="neutral">Hasta 10 invitados</FlexBadge>
           <FlexBadge tone="neutral">Servicio exclusivo</FlexBadge>
-        </div>
-      </section>
+          </div>
+        }
+      />
 
       {loading ? (
         <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
@@ -190,11 +188,12 @@ export default function VipPage() {
       ) : null}
 
       {!loading && !error && rooms.length === 0 ? (
-        <FlexCard className="text-center">
-          <Users className="mx-auto text-[var(--gold)]" size={32} />
-          <h2 className="mt-3 text-xl font-bold text-white">Aun no hay salas disponibles</h2>
-          <p className="mt-2 text-sm text-[var(--muted)]">Cuando el equipo active una sala VIP, aparecera aqui.</p>
-        </FlexCard>
+        <AppEmptyState
+          icon={<Users size={24} />}
+          title="Aun no hay salas disponibles"
+          description="Cuando el equipo active salas privadas, apareceran aqui."
+          primaryAction={{ href: "/app", label: "Volver al inicio" }}
+        />
       ) : null}
 
       {!loading && !error && rooms.length > 0 ? (

@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowRight, CalendarDays } from "lucide-react";
-import { Card, SectionTitle } from "@/components/ui/Card";
+import { AppEmptyState } from "@/components/app/AppEmptyState";
+import { AppPageHeader } from "@/components/app/AppPageHeader";
+import { Card } from "@/components/ui/Card";
 import { FlexBadge } from "@/components/ui/FlexBadge";
 import { FlexCard } from "@/components/ui/FlexCard";
 import { listPublishedEvents, type FlexEvent } from "@/lib/flex-actions";
@@ -32,10 +34,22 @@ export default function EventsPage() {
 
   return (
     <div className="space-y-5">
-      <SectionTitle title="Eventos" />
+      <AppPageHeader
+        eyebrow="Agenda FLEX"
+        title="Eventos"
+        description="Explora las proximas sesiones, conciertos y noches especiales."
+        className="lg:hidden"
+      />
       {loading ? <Card><p className="text-[var(--muted)]">Cargando eventos...</p></Card> : null}
       {error ? <Card><p className="text-red-200">{error}</p></Card> : null}
-      {!loading && !error && events.length === 0 ? <Card><p className="text-[var(--muted)]">No hay eventos publicados.</p></Card> : null}
+      {!loading && !error && events.length === 0 ? (
+        <AppEmptyState
+          icon={<CalendarDays size={24} />}
+          title="Aun no hay eventos publicados"
+          description="Cuando el equipo active nuevas sesiones, conciertos o actividades, apareceran aqui."
+          primaryAction={{ href: "/app", label: "Volver al inicio" }}
+        />
+      ) : null}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {events.map((event) => (
           <Link key={event.id} href={`/app/events/${event.id}`} className="gold-focus group block rounded-lg">

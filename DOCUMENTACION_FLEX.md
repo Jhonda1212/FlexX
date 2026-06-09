@@ -5067,3 +5067,707 @@ No se modifico:
 
 - Sustituir la espera estimada fija por datos reales si se modela tiempo de cola.
 - Mostrar avisos en tiempo real si se incorpora Supabase Realtime para la cola.
+
+---
+
+## Nota: correccion de params en compartir VIP - 2026-06-09
+
+### Cambio aplicado
+
+Se corrigio `/app/vip/[roomId]/share` para Next.js 16: la pagina es Client Component y ahora desenvuelve `params` con `use(params)` antes de leer `roomId`.
+
+La URL compartida se mantiene con el mismo formato:
+
+- `https://flex.app/vip/${roomId}/guest?token=demo_private_room_token`
+
+### Como probar
+
+1. Abrir `/app/vip`.
+2. Entrar a una sala.
+3. Abrir `/app/vip/[roomId]/share`.
+4. Confirmar que no aparece el error de acceso directo a `params.roomId`.
+
+### Pendiente
+
+- No hay pendiente nuevo; el cambio solo adapta el acceso a parametros dinamicos al comportamiento de Next.js 16.
+
+---
+
+## Fase actual: encabezados internos y empty states - 2026-06-09
+
+### Problema detectado
+
+Varias paginas internas del area de usuario dependian del encabezado generico del shell o tenian bloques de titulo escritos de forma distinta. Algunos estados vacios eran textos planos, lo que hacia que secciones funcionales como entradas, avisos, eventos, Hoy en FLEX o VIP se sintieran incompletas cuando no habia datos.
+
+### Componente de header
+
+Se creo `components/app/AppPageHeader.tsx` como encabezado interno sencillo para paginas de usuario. Soporta:
+
+- eyebrow opcional;
+- title;
+- description;
+- actions opcionales;
+- estilo FLEX oscuro/dorado;
+- comportamiento responsive.
+
+En paginas donde el shell ya muestra titulo en desktop, el header interno se usa solo en mobile para evitar duplicar jerarquia. Hoy en FLEX y Salas VIP mantienen encabezado visual completo porque funcionan como pantallas destacadas.
+
+### Componente de empty state
+
+Se creo `components/app/AppEmptyState.tsx` para estados vacios premium pero livianos. Soporta:
+
+- icono opcional;
+- title;
+- description;
+- primaryAction opcional;
+- secondaryAction opcional;
+- acciones apiladas correctamente en mobile.
+
+### Paginas actualizadas
+
+- `/app/today`: encabezado unificado y empty state con acciones a proximos eventos y VIP.
+- `/app/vip`: encabezado unificado y empty state con accion a inicio.
+- `/app/my-turn`: header interno responsive y estado sin turno con copy mas claro.
+- `/app/song-request`: header interno responsive manteniendo formulario y feedback.
+- `/app/profile`: header interno responsive compartido.
+- `/app/tickets`: header interno responsive y empty state con accion a proximos eventos.
+- `/app/notifications`: estado vacio profesional para avisos, sin placeholders estaticos.
+- `/app/events`: header interno responsive y empty state para agenda sin eventos.
+- `/app/events/[eventId]`: no se forzo header generico; el detalle conserva su propio hero/titulo.
+
+Tambien se ajustaron los route headers del shell de usuario para que desktop muestre titulos propios en eventos, tickets y avisos.
+
+### Que no se toco
+
+No se modifico:
+
+- Supabase schema;
+- migraciones;
+- RLS;
+- auth;
+- middleware;
+- roles;
+- queries Supabase;
+- mutaciones;
+- admin;
+- pagos;
+- Stripe;
+- logica de reservas VIP;
+- logica de canciones;
+- logica de turnos;
+- carrusel principal de `/app`.
+
+### Como probar manualmente
+
+1. Abrir `/app` y confirmar que la home mantiene `Bienvenido a FLEX`.
+2. Abrir `/app/today` y revisar encabezado, filtros y empty state si no hay publicaciones.
+3. Abrir `/app/vip` y revisar encabezado, cards y empty state si no hay salas activas.
+4. Abrir `/app/my-turn` y confirmar que el estado sin turno usa copy claro y el formulario sigue enviando.
+5. Abrir `/app/song-request` y confirmar que el formulario mantiene validaciones y feedback.
+6. Abrir `/app/tickets` y revisar empty state cuando no haya entradas o QR cuando existan.
+7. Abrir `/app/notifications` y confirmar el estado vacio con accion a inicio.
+8. Abrir `/app/events` y revisar empty state si no hay eventos.
+9. Abrir `/app/events/[eventId]` y confirmar que el detalle usa su hero propio, sin `Bienvenido a FLEX`.
+10. Probar desktop, laptop, tablet y mobile verificando que no haya overflow horizontal ni acciones desbordadas.
+
+### Pendientes
+
+- Conectar `/app/notifications` a notificaciones reales cuando se implemente la vista de datos final.
+- Conectar empty states a flujos reales de compra/reserva cuando pagos y tickets finales esten listos.
+
+---
+
+## Fase actual: mejora de administracion de staff - 2026-06-09
+
+### Problema anterior
+
+El panel `/admin/staff` permitia agregar o actualizar perfiles operativos en `staff_profiles`, pero obligaba al admin a copiar manualmente el `user_id` desde Supabase. Esto hacia incomodo asignar roles como `admin`, `guard`, `storage` o `dj` a usuarios ya registrados.
+
+### Nueva busqueda por email segura
+
+Se agrego una accion server-side para buscar usuarios existentes de Supabase Auth por email. La busqueda:
+
+- se ejecuta solo en servidor;
+- valida primero que la sesion actual pertenece a un staff `admin` activo;
+- usa `SUPABASE_SERVICE_ROLE_KEY` solo del lado servidor;
+- busca email exacto con comparacion case-insensitive;
+- devuelve solo datos minimos.
+
+### Validacion admin server-side
+
+Antes de buscar usuarios, listar staff, guardar staff o actualizar filas, las acciones server-side validan:
+
+1. usuario autenticado con Supabase Auth;
+2. fila activa en `staff_profiles`;
+3. rol `admin`.
+
+Si la validacion falla, la accion devuelve error de permisos y no consulta `auth.users`.
+
+### Datos que devuelve la busqueda
+
+La busqueda por email devuelve:
+
+- `user_id`;
+- `email`;
+- `full_name` desde `profiles` si existe.
+
+No devuelve passwords, tokens, metadata de Auth, providers, fechas internas ni otros datos sensibles.
+
+### Variable de entorno
+
+Se documento en `.env.example`:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Esta variable es server-only y no debe llevar prefijo `NEXT_PUBLIC_`.
+
+### Como crear y asignar staff
+
+1. Crear primero el usuario desde `/register`.
+2. Entrar con un usuario admin a `/admin/staff`.
+3. Buscar el email exacto del usuario registrado.
+4. Confirmar la card de usuario encontrado.
+5. Elegir rol operativo: `admin`, `guard`, `storage` o `dj`.
+6. Completar `display_name`.
+7. Marcar `Activo` si corresponde.
+8. Pulsar `Guardar staff`.
+
+La opcion manual por `user_id` se mantiene como fallback.
+
+### Que no se toco
+
+No se modifico:
+
+- migraciones;
+- Supabase schema;
+- RLS;
+- middleware;
+- roles existentes;
+- auth flow de login/register;
+- trigger de `profiles`;
+- creacion de usuarios desde admin;
+- invitaciones;
+- paginas de usuario;
+- pagos;
+- Stripe.
+
+### Pendientes
+
+- Crear flujo real de invitaciones para staff.
+- Crear usuarios desde admin cuando se defina el modelo de seguridad.
+- Mejorar paginacion/busqueda de Auth si el volumen de usuarios crece mucho.
+
+---
+
+## Fase actual: creacion segura de staff desde admin - 2026-06-09
+
+### Problema anterior
+
+`/admin/staff` ya permitia buscar un usuario por email y asignarle rol operativo, pero el formulario de guardado seguia aceptando texto libre en el campo `user_id`. Si un admin escribia un email en ese campo, Postgres devolvia:
+
+```text
+invalid input syntax for type uuid
+```
+
+Ademas, crear un usuario staff nuevo todavia obligaba a salir del panel, usar Supabase Studio o registrar manualmente el usuario en `/register`.
+
+### Buscar existente vs crear nuevo
+
+El panel ahora separa tres flujos:
+
+- `Crear usuario staff`: crea usuario en Supabase Auth con email y contrasena temporal, crea/actualiza `profiles` y crea/actualiza `staff_profiles`.
+- `Buscar usuario existente`: busca por email un usuario ya registrado y permite asignarle rol staff sin copiar UUID.
+- `Guardar por UUID manual`: queda como fallback menos protagonista y valida que el valor sea UUID antes de guardar.
+
+Si el admin escribe un email en el campo manual de UUID, la UI muestra un error claro:
+
+```text
+Este campo requiere un UUID. Usa la busqueda por email o crea un usuario nuevo.
+```
+
+### Uso server-side de service role
+
+La creacion y busqueda de usuarios usan `SUPABASE_SERVICE_ROLE_KEY` solo dentro de server actions. La clave no se expone al navegador y no lleva prefijo `NEXT_PUBLIC_`.
+
+La variable esta documentada en `.env.example`:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+### Validacion de admin activo
+
+Cada accion server-side valida antes de operar:
+
+1. sesion Supabase Auth actual;
+2. fila activa en `staff_profiles`;
+3. rol `admin`.
+
+Esto aplica a:
+
+- buscar usuario por email;
+- crear usuario staff;
+- guardar staff por usuario existente;
+- guardar staff por UUID manual;
+- actualizar rol, nombre operativo o estado activo.
+
+### Datos creados
+
+Cuando se crea un usuario staff nuevo desde admin:
+
+- en `auth.users`: email, password temporal y email confirmado;
+- en `profiles`: `id` del usuario y `full_name`;
+- en `staff_profiles`: `user_id`, `role`, `display_name` y `active`.
+
+Si el usuario ya existe:
+
+- no se duplica;
+- no se cambia su password automaticamente;
+- se reutiliza su `user_id`;
+- se actualizan `profiles` y `staff_profiles`;
+- se muestra el mensaje `El usuario ya existia; se actualizo su rol staff.`
+
+### Que no se expone
+
+No se expone:
+
+- `SUPABASE_SERVICE_ROLE_KEY`;
+- passwords;
+- tokens;
+- metadata sensible de Auth;
+- passwords existentes;
+- password temporal en la tabla de staff.
+
+La password temporal solo se usa en la server action para crear el usuario con Supabase Auth Admin. No se guarda en tablas publicas ni se escribe en logs.
+
+### Como probar manualmente
+
+1. Configurar `SUPABASE_SERVICE_ROLE_KEY` en `.env.local` y reiniciar el dev server.
+2. Entrar como admin a `/admin/staff`.
+3. En `Crear usuario staff`, escribir email nuevo, contrasena temporal de minimo 6 caracteres, display name, rol y estado activo.
+4. Pulsar `Crear staff`.
+5. Confirmar el mensaje `Usuario creado. Comparte la contrasena temporal de forma segura.`
+6. Cerrar sesion.
+7. Entrar con ese email y password temporal.
+8. Confirmar acceso segun rol: admin a `/admin`, guard a `/guard`, storage a `/storage`, dj a `/admin/queue`.
+9. Volver como admin, buscar por email un usuario existente y asignarle rol.
+10. Probar escribir un email en `Guardar por UUID manual` y confirmar el error de UUID.
+
+### Pendientes
+
+- Implementar invitaciones reales por email.
+- Agregar flujo separado para resetear contrasena de staff si se necesita.
+- Definir politica de cambio obligatorio de contrasena temporal en produccion.
+
+### Nota de pulido visual
+
+Se refino visualmente `/admin/staff` para que el flujo sea mas claro y compacto:
+
+1. Crear nuevo staff.
+2. Asignar rol a usuario existente.
+3. Usar UUID manual como modo avanzado/fallback.
+
+Los formularios redujeron altura, padding y peso visual de botones. El modo UUID manual quedo en una seccion colapsable de menor protagonismo. La tabla de staff usa filas, inputs, selects y acciones mas compactas.
+
+No se modificaron server actions, validaciones de admin, RLS, middleware, roles, Supabase schema, migraciones, auth normal ni paginas de usuario.
+
+---
+
+## Ajuste visual final de Staff - 2026-06-09
+
+### Cambios aplicados
+
+Se pulio el listado de `/admin/staff` para corregir detalles visuales:
+
+- la columna `Nombre` ya no muestra un input vacio por defecto;
+- `display_name` aparece como texto principal;
+- `full_name` aparece como dato secundario cuando aporta informacion;
+- si no hay dato secundario, se muestra un UUID corto como apoyo;
+- `user_id` se muestra truncado visualmente;
+- se agrego boton compacto `Copiar` para copiar el UUID completo;
+- el boton `Buscar usuario` evita partir el texto en dos lineas y queda mas compacto;
+- la tabla mantiene filas compactas, acciones alineadas y badge de estado compacto.
+
+### Que no se toco
+
+No se modifico:
+
+- server actions;
+- creacion de staff;
+- busqueda por email;
+- validacion admin;
+- `SUPABASE_SERVICE_ROLE_KEY`;
+- Supabase schema;
+- migraciones;
+- RLS;
+- auth;
+- middleware;
+- roles.
+
+---
+
+## Fase actual: pulido visual de Admin Eventos - 2026-06-09
+
+### Problema anterior
+
+`/admin/events` funcionaba, pero el formulario se sentia largo, tecnico y con poca jerarquia. Campos como `Precio cents opcional`, imagen, publicacion, destacado, precios por zona y acciones del listado competian visualmente en el mismo nivel.
+
+### Reorganizacion del formulario
+
+El formulario principal quedo agrupado sin crear pasos obligatorios:
+
+- `Informacion principal`: titulo, artista, inicio y fin opcional.
+- `Detalles`: zona, link artista, link externo opcional y descripcion.
+- `Capacidad y precio`: capacidad opcional y precio base.
+
+El modo edicion ahora muestra `Editando evento`, el evento seleccionado y una accion clara para cancelar edicion.
+
+### Mejoras en imagen
+
+El bloque de imagen se compacto y mantiene:
+
+- preview;
+- subida de archivo;
+- URL manual;
+- estado vacio `Imagen recomendada`.
+
+El copy visible ahora indica: `Sube una imagen del artista o pega una URL.`
+
+### Mejoras en publicacion y destacado
+
+`Publicado` y `Destacar en home` quedaron agrupados como controles compactos con helper text:
+
+- `Visible para usuarios.`
+- `Puede aparecer en el carrusel principal.`
+
+### Mejoras en precios por zona
+
+La seccion se redujo visualmente. Si no hay evento seleccionado, muestra una card ligera: `Guarda o edita un evento para gestionar sus entradas.`
+
+Cuando hay evento seleccionado, mantiene la gestion existente de tiers, pero con cards mas compactas, acciones alineadas y formulario lateral mas liviano.
+
+### Mejoras en listado
+
+El listado de eventos se refino con:
+
+- thumbnail compacto;
+- evento como titulo principal con artista/zona debajo;
+- fecha compacta;
+- precio desde;
+- badges agrupados;
+- acciones compactas y alineadas.
+
+`Despublicar` conserva su funcion, pero tiene menor peso visual.
+
+### Labels y copy
+
+Se cambio `Precio cents opcional` por `Precio desde` con input humano en EUR. Internamente se convierte y guarda en centavos.
+
+Tambien se ajustaron mensajes visibles:
+
+- `Completa titulo e inicio.`
+- `Evento creado.`
+- `Evento actualizado.`
+
+### Que no se toco
+
+No se modifico:
+
+- Supabase schema;
+- migraciones;
+- RLS;
+- auth;
+- middleware;
+- roles;
+- logica de creacion/edicion/publicacion;
+- subida de imagenes;
+- listado de eventos;
+- logica de precios por zona;
+- admin staff, pagos, VIP ni paginas de usuario.
+
+### Como probar manualmente
+
+1. Entrar como admin a `/admin/events`.
+2. Crear un evento con titulo, inicio, imagen por subida o URL, precio desde, publicacion y destacado.
+3. Confirmar que el evento aparece en el listado.
+4. Pulsar `Editar` y confirmar que el formulario cambia a modo edicion.
+5. Guardar cambios.
+6. Seleccionar un evento y gestionar precios por zona.
+7. Confirmar que `/app` muestra eventos publicados futuros.
+
+### Pendientes
+
+- Evaluar mas adelante si los precios por zona tambien deben pasar a input humano EUR en vez de centavos.
+- Definir un patron compartido de formularios admin si se repite este nivel de agrupacion.
+
+---
+
+## Fase actual: simplificacion de Admin Eventos - 2026-06-09
+
+### Problema anterior
+
+Aunque `/admin/events` ya tenia mejor jerarquia visual, el formulario completo seguia siempre visible. Eso hacia que la pantalla se sintiera cargada y que el listado de eventos existentes perdiera protagonismo.
+
+### Nuevo flujo con Nuevo evento
+
+La pantalla ahora abre con el listado como area principal de gestion. El formulario queda oculto por defecto y aparece solo cuando el admin:
+
+- pulsa `Nuevo evento`;
+- pulsa `Editar` en un evento existente.
+
+El header incluye una accion principal `Nuevo evento` para iniciar el flujo de creacion.
+
+### Modo crear/editar
+
+El formulario diferencia claramente:
+
+- `Crear evento`: formulario limpio con datos iniciales.
+- `Editando evento`: carga el evento seleccionado y muestra su nombre como contexto.
+
+El cierre usa:
+
+- `Cerrar formulario` en modo creacion;
+- `Cancelar edicion` en modo edicion.
+
+El CTA mantiene:
+
+- `Crear evento` al crear;
+- `Guardar cambios` al editar.
+
+### Listado con mas protagonismo
+
+`Eventos existentes` se muestra inmediatamente despues del header y feedback de carga/error/exito. La tabla mantiene el patron responsive existente, pero queda como centro de la pantalla cuando no hay formulario abierto.
+
+El listado conserva:
+
+- imagen;
+- titulo;
+- artista / zona;
+- fecha;
+- precio;
+- estado;
+- acciones compactas.
+
+`Editar` queda como accion principal de gestion; `Ver`, `Destacar` y publicar/despublicar se mantienen como acciones operativas.
+
+### Formulario compactado
+
+El formulario se redujo a tres grupos:
+
+- `Informacion`: titulo, artista, inicio, fin opcional, zona y descripcion.
+- `Imagen y enlaces`: preview, subida, URL manual, link artista y link externo.
+- `Publicacion y precio`: capacidad, precio desde, publicado, destacado y CTA.
+
+El precio sigue usando UX humana en EUR y se convierte internamente a centavos.
+
+### Precios por zona compactos
+
+Cuando no hay evento seleccionado, la seccion muestra una card compacta:
+
+- `Entradas por zona`
+- `Selecciona o edita un evento para gestionar sus precios.`
+
+Cuando se edita un evento, aparece la gestion real de tiers sin cambiar su logica.
+
+### Que no se toco
+
+No se modifico:
+
+- Supabase;
+- migraciones;
+- schema;
+- RLS;
+- auth;
+- middleware;
+- roles;
+- server actions;
+- logica sensible de eventos;
+- subida de imagenes;
+- publicacion/destacado;
+- precios por zona;
+- admin staff;
+- app publica/usuario;
+- carrusel.
+
+### Como probar
+
+1. Abrir `/admin/events`.
+2. Confirmar que el listado aparece sin formulario dominante.
+3. Pulsar `Nuevo evento` y confirmar que aparece `Crear evento`.
+4. Crear un evento con imagen o URL, precio desde, publicacion y destacado.
+5. Pulsar `Editar` en un evento existente.
+6. Confirmar modo `Editando evento`.
+7. Cancelar edicion y verificar que el formulario se oculta.
+8. Publicar/despublicar y destacar desde el listado.
+9. Editar un evento y gestionar entradas por zona.
+10. Confirmar que `/app` muestra eventos publicados futuros.
+
+---
+
+## Fase actual: refinamiento visual de Admin Eventos - 2026-06-09
+
+### Problema visual detectado
+
+La estructura de `/admin/events` ya era correcta, con listado arriba y formulario solo al crear/editar, pero todavia se percibia pesada. Los botones secundarios tenian demasiado peso, las tarjetas internas del formulario eran rigidas, las acciones del listado competian entre si y el input de precio conservaba controles nativos poco premium.
+
+### Mejoras en botones
+
+Se agrego un boton local compacto para acciones de esta pagina. El listado ahora diferencia mejor:
+
+- `Editar` como accion principal pequena;
+- `Ver` y `Destacar` como acciones secundarias;
+- `Despublicar` como danger discreto;
+- `Cerrar formulario` y `Cancelar edicion` como acciones secundarias menos dominantes.
+
+Los CTAs principales `Nuevo evento`, `Crear evento` y `Guardar cambios` redujeron altura y tracking para verse mas contenidos.
+
+### Mejoras en listado
+
+El listado mantiene la tabla existente, pero se refino visualmente:
+
+- filas mas compactas;
+- hover suave;
+- thumbnail consistente;
+- titulo limitado visualmente a dos lineas;
+- artista/zona como texto secundario;
+- fecha y precio alineados;
+- badges agrupados;
+- acciones con botones pequenos y sin textos partidos.
+
+### Mejoras en formulario
+
+Los grupos `Informacion`, `Imagen y enlaces` y `Publicacion y precio` se mantienen, pero ahora tienen:
+
+- menos padding;
+- bordes mas sutiles;
+- fondo mas liviano;
+- titulos mas pequenos;
+- menos separacion vertical;
+- descripcion con altura mas razonable.
+
+El formulario se siente mas como panel premium compacto y menos como varias tarjetas pesadas.
+
+### Mejoras en publicacion y precio
+
+`Precio desde` conserva UX humana en EUR y conversion interna a centavos. Se redujo el protagonismo del helper y se ocultaron controles nativos del input numerico con CSS local.
+
+`Publicado` y `Destacar en home` ahora se ven como opciones compactas, con hover suave y menor peso visual.
+
+### Precios por zona
+
+La seccion de entradas por zona se mantuvo compacta:
+
+- estado sin evento con borde y padding reducidos;
+- tiers con cards mas livianas;
+- acciones pequenas;
+- formulario de precio con menos padding.
+
+No se cambio la logica de tiers.
+
+### Que no se toco
+
+No se modifico:
+
+- Supabase;
+- migraciones;
+- schema;
+- RLS;
+- auth;
+- middleware;
+- roles;
+- server actions;
+- creacion/edicion/publicacion de eventos;
+- destacado;
+- subida de imagenes;
+- precios por zona;
+- admin staff;
+- admin pagos;
+- app usuario;
+- carrusel.
+
+### Como probar manualmente
+
+1. Abrir `/admin/events`.
+2. Revisar que el listado se vea compacto y que las acciones no dominen la fila.
+3. Pulsar `Nuevo evento`.
+4. Revisar que el formulario se vea mas liviano y compacto.
+5. Crear evento con imagen o URL.
+6. Editar un evento existente.
+7. Cerrar formulario o cancelar edicion.
+8. Publicar/despublicar.
+9. Destacar/quitar destacado.
+10. Probar responsive en laptop, tablet y mobile.
+
+---
+
+## Fase actual: correccion de imagen en carrusel principal - 2026-06-09
+
+### Bug detectado
+
+La imagen subida desde `/admin/events` se guardaba bien y aparecia correctamente en el detalle del evento, pero el carrusel principal de `/app` la renderizaba rota.
+
+### Causa
+
+El carrusel dependia de la ruta de imagen tratada por su componente de fondo, y no compartia el mismo render seguro que el detalle. El dato seguia siendo valido, pero el render era mas fragil para URLs remotas de Supabase Storage local.
+
+### Fix aplicado
+
+Se unifico la resolucion de imagen de evento para que el flujo use:
+
+- `image_url` primero;
+- `cover_image_path` como fallback;
+- `null` si no hay imagen.
+
+El carrusel principal ya usa esa misma URL normalizada y el fondo remoto se dibuja sin icono roto cuando la imagen es una URL `http/https` de Supabase Storage local.
+
+### Formato correcto de imagen
+
+Una imagen valida puede llegar como:
+
+- URL publica de Supabase Storage local, por ejemplo `http://127.0.0.1:54321/storage/v1/object/public/event-images/...`;
+- URL publica remota;
+- ruta local tipo `/images/events/...`.
+
+### Que no se toco
+
+No se modifico:
+
+- Supabase;
+- Storage;
+- migraciones;
+- RLS;
+- auth;
+- middleware;
+- roles;
+- detalle del evento;
+- admin/events salvo para confirmar el campo que se guarda;
+- autoplay ni diseño general del carrusel.
+
+### Como probar manualmente
+
+1. Subir una imagen desde `/admin/events`.
+2. Publicar y destacar el evento.
+3. Abrir `/app/events/[eventId]` y confirmar que la imagen aparece.
+4. Abrir `/app` y confirmar que el carrusel principal muestra la misma imagen.
+5. Confirmar que un evento sin imagen muestra fallback y no un icono roto.
+
+### Guia rapida para crear eventos con imagen
+
+1. Entrar a `/admin/events`.
+2. Pulsar `Nuevo evento`.
+3. Completar titulo, fecha de inicio y los datos basicos del evento.
+4. Elegir una imagen de una de estas formas:
+   - usar una ruta local existente como `/images/events/nejo.jpg`;
+   - subir una imagen desde el selector del admin, que generara una URL publica de Supabase Storage;
+   - pegar una URL publica valida en `image_url`.
+5. Publicar el evento con `Publicado`.
+6. Marcar `Destacar en home` si debe aparecer en el carrusel principal.
+7. Guardar el evento.
+8. Abrir `/app` y verificar que el carrusel muestra la imagen correcta.
+9. Abrir `/app/events/[eventId]` y confirmar que el detalle usa la misma imagen.
+
+### Errores comunes
+
+- Pegar `public/images/...` en lugar de `/images/...`.
+- Pegar solo el nombre del archivo, como `nejo.jpg`, en vez de una ruta o URL completa.
+- Olvidar marcar el evento como `Publicado`.
+- Dejar el evento sin fecha futura, lo que impide que aparezca como proximo evento.
+- Olvidar marcar `Destacar en home` si se espera verlo en el carrusel principal.

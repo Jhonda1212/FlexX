@@ -121,6 +121,26 @@ function mapTicketStatus(status: string): TicketView["status"] {
   return "cancelled";
 }
 
+function normalizeImageCandidate(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+export function getEventImageUrl(event: {
+  imageUrl?: string | null;
+  image_url?: string | null;
+  coverImagePath?: string | null;
+  cover_image_path?: string | null;
+} | null | undefined) {
+  return (
+    normalizeImageCandidate(event?.imageUrl) ??
+    normalizeImageCandidate(event?.image_url) ??
+    normalizeImageCandidate(event?.coverImagePath) ??
+    normalizeImageCandidate(event?.cover_image_path) ??
+    null
+  );
+}
+
 function localEventDateIso(date: string) {
   const [day, month] = date.split(" ");
   const monthIndex = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"].indexOf(month);
@@ -158,7 +178,7 @@ function mapFeaturedEvent(event: any): FeaturedEventView {
     ticketPriceCents: (event.ticket_price_cents as number | null) ?? null,
     dateLabel: formatDateLabel(event.starts_at as string),
     zone: (event.zone_name as string | null) ?? "FLEX",
-    imageUrl: (event.image_url as string | null) ?? (event.cover_image_path as string | null) ?? null,
+    imageUrl: getEventImageUrl(event),
     artistUrl: (event.artist_url as string | null) ?? null,
     externalUrl: (event.external_url as string | null) ?? null,
     featured: Boolean(event.featured),
@@ -298,7 +318,7 @@ export async function listPublishedEvents(): Promise<FlexEvent[]> {
     capacity: event.capacity as number,
     ticketPriceCents: event.ticket_price_cents as number,
     dateLabel: formatDateLabel(event.starts_at as string),
-    imageUrl: ((event.image_url as string | null) ?? (event.cover_image_path as string | null)) || null,
+    imageUrl: getEventImageUrl(event),
     artist: (event.artist_name as string | null) ?? null,
     artistUrl: (event.artist_url as string | null) ?? null,
     zone: (event.zone_name as string | null) ?? null,

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Clock3, Mic2 } from "lucide-react";
+import { AppPageHeader } from "@/components/app/AppPageHeader";
 import { FlexBadge } from "@/components/ui/FlexBadge";
 import { FlexButton } from "@/components/ui/FlexButton";
 import { FlexCard } from "@/components/ui/FlexCard";
@@ -52,22 +53,22 @@ export default function MyTurnPage() {
   const hasTurn = position !== null;
 
   return (
-    <div className="grid min-w-0 gap-5 2xl:grid-cols-[minmax(0,1fr)_300px]">
-      <FlexCard className="overflow-hidden border-[var(--gold)]/20 p-0">
-        <div className="border-b border-white/10 bg-[linear-gradient(135deg,rgba(217,166,64,0.12),rgba(8,8,8,0.96)_54%,rgba(72,18,18,0.16))] px-5 py-4 sm:px-6">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--gold)]">Mi turno en vivo</p>
-          <h1 className="mt-2 text-2xl font-bold text-white sm:text-3xl">Mi turno en vivo</h1>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-white/70">
-            Apuntate para cantar, tocar o subir al escenario esta noche.
-          </p>
-        </div>
+    <div className="grid min-w-0 gap-5">
+      <AppPageHeader
+        eyebrow="Escenario FLEX"
+        title="Mi turno en vivo"
+        description="Apuntate para cantar, tocar o subir al escenario esta noche."
+        className="lg:hidden"
+      />
 
+      <div className="grid min-w-0 gap-5 2xl:grid-cols-[minmax(0,1fr)_300px]">
+      <FlexCard className="overflow-hidden border-[var(--gold)]/20 p-0">
         <div className="grid gap-0 lg:grid-cols-[280px_minmax(0,1fr)]">
           <section className="border-b border-white/10 p-5 sm:p-6 lg:border-b-0 lg:border-r lg:border-white/10">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-bold uppercase tracking-[0.12em] text-white/60">Estado actual</p>
-                <h2 className="mt-3 text-2xl font-bold text-white">{hasTurn ? "Turno activo" : "Sin turno activo"}</h2>
+                <h2 className="mt-3 text-2xl font-bold text-white">{hasTurn ? "Turno activo" : "Aun no estas en la lista"}</h2>
               </div>
               <div className="grid size-12 shrink-0 place-items-center rounded-full border border-[var(--gold)]/35 bg-[var(--gold)]/10 text-[var(--gold)]">
                 <Mic2 size={22} />
@@ -88,7 +89,7 @@ export default function MyTurnPage() {
             <p className="mt-5 text-sm leading-6 text-[var(--muted)]">
               {hasTurn
                 ? "Tu sitio esta confirmado. Mantente atento a los avisos del staff cuando tu turno este cerca."
-                : "Aun no estas en la lista. Cuando te unas, veremos tu posicion aqui."}
+                : "Unete para que el equipo revise tu solicitud y te incorpore al escenario."}
             </p>
 
             <div className="mt-5">
@@ -177,6 +178,7 @@ export default function MyTurnPage() {
           </p>
         </FlexCard>
       </aside>
+      </div>
     </div>
   );
 }

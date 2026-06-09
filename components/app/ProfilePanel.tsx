@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Bell, CreditCard, LockKeyhole, UserRound } from "lucide-react";
+import { AppPageHeader } from "@/components/app/AppPageHeader";
 import { FlexBadge } from "@/components/ui/FlexBadge";
 import { FlexButton } from "@/components/ui/FlexButton";
 import { FlexCard } from "@/components/ui/FlexCard";
@@ -211,11 +212,12 @@ export function ProfilePanel() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-5">
-      <div className="lg:hidden">
-        <p className="text-xs font-bold uppercase tracking-[0.24em] text-[var(--gold)]">Cuenta FLEX</p>
-        <h1 className="font-display mt-2 text-5xl text-white">Mi perfil</h1>
-        <p className="mt-2 text-sm leading-6 text-[var(--muted)]">Gestiona tu cuenta, seguridad y preferencias.</p>
-      </div>
+      <AppPageHeader
+        eyebrow="Cuenta FLEX"
+        title="Mi perfil"
+        description="Gestiona tu cuenta, seguridad y preferencias."
+        className="lg:hidden"
+      />
 
       <section className="rounded-2xl border border-white/10 bg-[linear-gradient(135deg,rgba(255,255,255,0.055),rgba(255,255,255,0.025)),radial-gradient(circle_at_top_left,rgba(212,175,55,0.13),transparent_36%)] p-5 shadow-xl shadow-black/25 sm:p-6">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">

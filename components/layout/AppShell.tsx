@@ -21,6 +21,7 @@ export function AppShell({
   title = "FLEX",
   subtitle = "Acciones rápidas, lectura clara y control en directo.",
   routeHeaders = {},
+  hideHeaderPrefixes = [],
   role = null
 }: {
   children: ReactNode;
@@ -29,6 +30,7 @@ export function AppShell({
   title?: string;
   subtitle?: string;
   routeHeaders?: Record<string, { title: string; subtitle: string }>;
+  hideHeaderPrefixes?: string[];
   role?: AppRole | null;
 }) {
   const pathname = usePathname();
@@ -48,6 +50,10 @@ export function AppShell({
   const header = useMemo(
     () => routeHeaders[pathname] ?? { title, subtitle },
     [pathname, routeHeaders, title, subtitle]
+  );
+  const hideHeaderText = useMemo(
+    () => hideHeaderPrefixes.some((prefix) => pathname.startsWith(prefix)),
+    [hideHeaderPrefixes, pathname]
   );
 
   useEffect(() => {
@@ -174,7 +180,7 @@ export function AppShell({
             <div className="lg:hidden">
               <Logo staff={staff} />
             </div>
-            <div className="hidden lg:block">
+            <div className={hideHeaderText ? "hidden" : "hidden lg:block"}>
               <h1 className="text-2xl font-bold text-white">{header.title}</h1>
               <p className="mt-1 text-sm text-[var(--muted)]">{header.subtitle}</p>
             </div>

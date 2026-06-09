@@ -1,15 +1,13 @@
 import Image from "next/image";
 
-function canUseNextImage(src: string) {
-  if (src.startsWith("/")) return true;
+function isLocalAsset(src: string) {
+  return src.startsWith("/");
+}
 
+function isRemoteHttpUrl(src: string) {
   try {
     const url = new URL(src);
-    return (
-      (url.hostname === "127.0.0.1" && url.port === "54321") ||
-      url.hostname === "localhost" ||
-      url.hostname.endsWith(".supabase.co")
-    );
+    return url.protocol === "http:" || url.protocol === "https:";
   } catch {
     return false;
   }
@@ -28,7 +26,7 @@ export function OptimizedBackdropImage({
   sizes: string;
   className?: string;
 }) {
-  if (canUseNextImage(src)) {
+  if (isLocalAsset(src)) {
     return (
       <Image
         src={src}
@@ -37,6 +35,16 @@ export function OptimizedBackdropImage({
         priority={priority}
         sizes={sizes}
         className={`object-cover ${className}`}
+      />
+    );
+  }
+
+  if (isRemoteHttpUrl(src)) {
+    return (
+      <div
+        aria-hidden="true"
+        className={`bg-cover bg-center ${className}`}
+        style={{ backgroundImage: `url(${src})` }}
       />
     );
   }
