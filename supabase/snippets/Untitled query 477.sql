@@ -1,0 +1,30 @@
+-- select
+--   id,
+--   title,
+--   body,
+--   type,
+--   priority,
+--   starts_at,
+--   ends_at,
+--   cta_label,
+--   cta_url,
+--   is_published,
+--   is_pinned,
+--   event_id,
+--   zone_id,
+--   created_at
+-- from public.daily_feed_posts
+-- order by created_at desc;
+
+select
+  schemaname,
+  tablename,
+  policyname,
+  permissive,
+  roles,
+  cmd,
+  qual,
+  with_check
+from pg_policies
+where schemaname = 'public'
+  and tablename = 'daily_feed_posts';

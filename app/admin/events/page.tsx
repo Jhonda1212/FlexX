@@ -13,6 +13,7 @@ import { Card, SectionTitle } from "@/components/ui/Card";
 import { FlexBadge } from "@/components/ui/FlexBadge";
 import { FlexButton } from "@/components/ui/FlexButton";
 import { cents, fromDateTimeLocal, isoInputValue, requireAdmin } from "@/lib/admin-actions";
+import { deleteAdminEvent } from "./actions";
 
 type EventRow = {
   id: string;
@@ -80,7 +81,6 @@ const emptyTierForm = {
 const inputClass = "gold-focus h-11 w-full rounded-md border border-white/10 bg-black/40 px-3 text-sm text-white placeholder:text-white/35";
 const textareaClass = "gold-focus w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/35";
 const labelClass = "text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--muted)]";
-const helperClass = "text-xs leading-5 text-[var(--muted)]";
 const numberInputCleanClass = "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
 
 function isValidUrl(value: string) {
@@ -160,13 +160,15 @@ function SmallActionButton({
   href,
   onClick,
   variant = "ghost",
-  emphasis = false
+  emphasis = false,
+  disabled = false
 }: {
   children: React.ReactNode;
   href?: string;
   onClick?: () => void;
   variant?: "primary" | "ghost" | "danger" | "success";
   emphasis?: boolean;
+  disabled?: boolean;
 }) {
   const variants = {
     primary: "border-[var(--gold)]/50 bg-[var(--gold)] text-black hover:bg-[var(--gold-bright)]",
@@ -174,13 +176,13 @@ function SmallActionButton({
     danger: "border-red-500/20 bg-red-500/8 text-red-100 hover:border-red-400/35 hover:bg-red-500/14",
     success: "border-green-500/25 bg-green-500/12 text-green-100 hover:border-green-400/40 hover:bg-green-500/18"
   };
-  const className = `gold-focus inline-flex h-9 whitespace-nowrap rounded-md border px-3 text-xs font-bold uppercase tracking-[0.06em] transition-[background-color,border-color,color,transform] duration-200 hover:-translate-y-px active:translate-y-0 ${emphasis ? "shadow-[0_8px_18px_rgba(217,166,64,0.1)]" : ""} ${variants[variant]}`;
+  const className = `gold-focus inline-flex h-9 whitespace-nowrap rounded-md border px-3 text-xs font-bold uppercase tracking-[0.06em] transition-[background-color,border-color,color,transform] duration-200 hover:-translate-y-px active:translate-y-0 disabled:pointer-events-none disabled:opacity-45 ${emphasis ? "shadow-[0_8px_18px_rgba(217,166,64,0.1)]" : ""} ${variants[variant]}`;
 
-  if (href) {
+  if (href && !disabled) {
     return <Link href={href} className={`${className} items-center justify-center`}>{children}</Link>;
   }
 
-  return <button type="button" className={`${className} items-center justify-center`} onClick={onClick}>{children}</button>;
+  return <button type="button" className={`${className} items-center justify-center`} onClick={onClick} disabled={disabled}>{children}</button>;
 }
 
 export default function AdminEventsPage() {
@@ -195,6 +197,8 @@ export default function AdminEventsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingTier, setSavingTier] = useState(false);
+  const [deletingId, setDeletingId] = useState("");
+  const [ticketOptionsOpen, setTicketOptionsOpen] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -248,6 +252,7 @@ export default function AdminEventsPage() {
     setForm(emptyForm);
     setTierForm(emptyTierForm);
     setFormMode("closed");
+    setTicketOptionsOpen(false);
   }
 
   function startNewEvent() {
@@ -257,6 +262,7 @@ export default function AdminEventsPage() {
     setForm(emptyForm);
     setTierForm(emptyTierForm);
     setFormMode("create");
+    setTicketOptionsOpen(false);
   }
 
   function editEvent(event: EventRow) {
@@ -265,6 +271,7 @@ export default function AdminEventsPage() {
     setImageFile(null);
     setTierForm(emptyTierForm);
     setFormMode("edit");
+    setTicketOptionsOpen(false);
     setForm({
       title: event.title,
       artist_name: event.artist_name ?? "",
@@ -373,6 +380,29 @@ export default function AdminEventsPage() {
       await load();
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : "No se pudo actualizar el evento.");
+    }
+  }
+
+  async function deleteEvent(event: EventRow) {
+    setError("");
+    setMessage("");
+
+    if (!window.confirm("¿Eliminar este evento? Esta acción no se puede deshacer.")) {
+      return;
+    }
+
+    setDeletingId(event.id);
+    try {
+      await deleteAdminEvent(event.id);
+      if (editingId === event.id) {
+        resetForm();
+      }
+      setMessage("Evento eliminado.");
+      await load();
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : "No se pudo eliminar el evento.");
+    } finally {
+      setDeletingId("");
     }
   }
 
@@ -526,6 +556,7 @@ export default function AdminEventsPage() {
                       {event.is_published ? <SmallActionButton variant="ghost" href={`/app/events/${event.id}`}>Ver</SmallActionButton> : null}
                       <SmallActionButton variant="ghost" onClick={() => updateFlags(event.id, { featured: !event.featured })}>{event.featured ? "Quitar destacado" : "Destacar"}</SmallActionButton>
                       <SmallActionButton variant={event.is_published ? "danger" : "success"} onClick={() => updateFlags(event.id, { is_published: !event.is_published })}>{event.is_published ? "Despublicar" : "Publicar"}</SmallActionButton>
+                      <SmallActionButton variant="danger" disabled={deletingId === event.id} onClick={() => deleteEvent(event)}>{deletingId === event.id ? "Eliminando" : "Eliminar"}</SmallActionButton>
                     </div>
                   </td>
                 </tr>
@@ -631,19 +662,22 @@ export default function AdminEventsPage() {
         </Card>
       ) : null}
 
-      <Card className={!editingId ? "py-3.5" : "p-4"}>
-        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <Card className={editingId && ticketOptionsOpen ? "p-4" : "py-3.5"}>
+        <div className={editingId && ticketOptionsOpen ? "mb-4 flex flex-wrap items-start justify-between gap-3" : "flex flex-wrap items-center justify-between gap-3 px-4"}>
           <div>
-            <SectionTitle title="Entradas por zona" />
-            {!editingId ? <p className="-mt-2 text-sm text-[var(--muted)]">Selecciona o edita un evento para gestionar sus precios.</p> : null}
-            {editingId ? <p className="-mt-2 text-sm text-[var(--muted)]">Gestiona entradas del evento seleccionado.</p> : null}
+            <SectionTitle title="Opciones avanzadas de entradas" />
+            {!editingId ? <p className="-mt-2 text-sm text-[var(--muted)]">Edita un evento para abrir la gestion de entradas por zona.</p> : null}
+            {editingId ? <p className="-mt-2 text-sm text-[var(--muted)]">{ticketOptionsOpen ? "Gestiona entradas por zona del evento seleccionado." : "Entradas por zona disponibles al abrir esta seccion."}</p> : null}
           </div>
+          {editingId ? (
+            <SmallActionButton onClick={() => setTicketOptionsOpen((open) => !open)}>
+              {ticketOptionsOpen ? "Ocultar" : "Abrir"}
+            </SmallActionButton>
+          ) : null}
         </div>
         {!editingId ? (
-          <div className="rounded-md border border-white/[0.07] bg-white/[0.018] px-3 py-2.5">
-            <p className="text-sm font-bold text-white">Selecciona o edita un evento para gestionar sus precios.</p>
-          </div>
-        ) : (
+          null
+        ) : ticketOptionsOpen ? (
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
             <div className="space-y-3">
               {tiersForEditingEvent.length ? (
@@ -732,7 +766,7 @@ export default function AdminEventsPage() {
               </div>
             </form>
           </div>
-        )}
+        ) : null}
       </Card>
     </div>
   );

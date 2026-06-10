@@ -67,8 +67,15 @@
 -- )
 -- order by u.email;
 
-select column_name, data_type
-from information_schema.columns
-where table_schema = 'public'
-and table_name = 'events'
-order by ordinal_position;
+-- select column_name, data_type
+-- from information_schema.columns
+-- where table_schema = 'public'
+-- and table_name = 'events'
+-- order by ordinal_position;
+update public.daily_feed_posts
+set
+  starts_at = null,
+  ends_at = null,
+  is_published = true,
+  is_pinned = true
+where title = 'Jhonda';

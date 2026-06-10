@@ -26,14 +26,51 @@ type FeedAdminRow = {
   priority: string;
   starts_at: string | null;
   ends_at: string | null;
+  image_url: string | null;
   cta_label: string | null;
   cta_url: string | null;
   is_published: boolean;
   is_pinned: boolean;
   created_at: string;
   club_zones?: { name?: string | null } | null;
-  events?: { title?: string | null } | null;
+  events?: { title?: string | null; image_url?: string | null; cover_image_path?: string | null } | null;
 };
+
+function normalizeFeedImageUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  const withoutPublic = trimmed.replace(/^public\//i, "");
+  return withoutPublic.startsWith("/") ? withoutPublic : `/${withoutPublic}`;
+}
+
+function extensionForFile(file: File) {
+  const extension = file.name.split(".").pop()?.toLowerCase();
+  return extension && extension.length <= 5 ? extension : "jpg";
+}
+
+function sanitizeImagePrefix(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "") || "feed";
+}
+
+function isValidManualImageReference(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return true;
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      new URL(trimmed);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  const normalized = trimmed.replace(/^public\//i, "");
+  return normalized.length > 0 && !/\s/.test(normalized);
+}
 
 function toForm(post: FeedAdminRow): FeedPostFormState {
   return {
@@ -45,11 +82,62 @@ function toForm(post: FeedAdminRow): FeedPostFormState {
     event_id: post.event_id ?? "",
     starts_at: isoInputValue(post.starts_at),
     ends_at: isoInputValue(post.ends_at),
+    image_url: post.image_url ?? "",
     cta_label: post.cta_label ?? "",
     cta_url: post.cta_url ?? "",
     is_published: post.is_published,
     is_pinned: post.is_pinned
   };
+}
+
+function getDateWindowError(startsAt: string | null | undefined, endsAt: string | null | undefined) {
+  if (!startsAt || !endsAt) return "";
+  const startTime = new Date(startsAt).getTime();
+  const endTime = new Date(endsAt).getTime();
+  if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) return "Revisa las fechas de publicacion.";
+  if (endTime <= startTime) return "La fecha de fin debe ser posterior a la fecha de inicio.";
+  return "";
+}
+
+function getVisibilityBadge(post: FeedAdminRow) {
+  if (!post.is_published) {
+    return {
+      label: "SIN PUBLICAR",
+      className: "border-white/12 bg-white/[0.04] text-white/58"
+    };
+  }
+
+  const now = Date.now();
+  const startsAt = post.starts_at ? new Date(post.starts_at).getTime() : null;
+  const endsAt = post.ends_at ? new Date(post.ends_at).getTime() : null;
+
+  if (startsAt && startsAt > now) {
+    return {
+      label: "PROGRAMADA",
+      className: "border-sky-300/25 bg-sky-400/10 text-sky-100"
+    };
+  }
+
+  if (endsAt && endsAt < now) {
+    return {
+      label: "VENCIDA",
+      className: "border-red-300/25 bg-red-500/10 text-red-100"
+    };
+  }
+
+  return {
+    label: "VISIBLE AHORA",
+    className: "border-green-300/25 bg-green-400/10 text-green-100"
+  };
+}
+
+function VisibilityBadge({ post }: { post: FeedAdminRow }) {
+  const visibility = getVisibilityBadge(post);
+  return (
+    <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${visibility.className}`}>
+      {visibility.label}
+    </span>
+  );
 }
 
 function validateForm(form: FeedPostFormState) {
@@ -59,9 +147,8 @@ function validateForm(form: FeedPostFormState) {
   if (form.cta_url && !form.cta_url.startsWith("/") && !form.cta_url.startsWith("https://")) {
     return "La URL del CTA debe empezar con / o con https://.";
   }
-  if (form.starts_at && form.ends_at && new Date(form.ends_at).getTime() <= new Date(form.starts_at).getTime()) {
-    return "La fecha de fin debe ser mayor que la fecha de inicio.";
-  }
+  const dateWindowError = getDateWindowError(form.starts_at, form.ends_at);
+  if (dateWindowError) return dateWindowError;
   return "";
 }
 
@@ -70,6 +157,9 @@ export default function AdminFeedPage() {
   const [zones, setZones] = useState<Array<{ id: string; name: string }>>([]);
   const [events, setEvents] = useState<Array<{ id: string; title: string }>>([]);
   const [form, setForm] = useState<FeedPostFormState>(emptyFeedPostForm);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageInputKey, setImageInputKey] = useState(0);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
   const [editingId, setEditingId] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -82,7 +172,7 @@ export default function AdminFeedPage() {
     const [postResult, zoneResult, eventResult] = await Promise.all([
       supabase
         .from("daily_feed_posts")
-        .select("id, event_id, zone_id, title, body, type, priority, starts_at, ends_at, cta_label, cta_url, is_published, is_pinned, created_at, club_zones(name), events(title)")
+        .select("id, event_id, zone_id, title, body, type, priority, starts_at, ends_at, image_url, cta_label, cta_url, is_published, is_pinned, created_at, club_zones(name), events(title, image_url, cover_image_path)")
         .order("is_pinned", { ascending: false })
         .order("created_at", { ascending: false }),
       supabase.from("club_zones").select("id, name").order("name", { ascending: true }),
@@ -97,6 +187,19 @@ export default function AdminFeedPage() {
   }
 
   useEffect(() => {
+    if (imageFile) {
+      const previewUrl = URL.createObjectURL(imageFile);
+      setImagePreviewUrl(previewUrl);
+      return () => {
+        URL.revokeObjectURL(previewUrl);
+      };
+    }
+
+    setImagePreviewUrl(normalizeFeedImageUrl(form.image_url) ?? "");
+    return undefined;
+  }, [form.image_url, imageFile]);
+
+  useEffect(() => {
     let active = true;
     load().catch((loadError) => active && setError(loadError instanceof Error ? loadError.message : "No se pudo cargar el feed.")).finally(() => active && setLoading(false));
     return () => {
@@ -106,8 +209,30 @@ export default function AdminFeedPage() {
 
   function resetForm() {
     setForm(emptyFeedPostForm);
+    setImageFile(null);
+    setImageInputKey((value) => value + 1);
+    setImagePreviewUrl("");
     setEditingId("");
     setShowForm(false);
+  }
+
+  function clearImage() {
+    setImageFile(null);
+    setImageInputKey((value) => value + 1);
+    setForm({ ...form, image_url: "" });
+  }
+
+  async function uploadFeedImage(file: File, postTitle: string) {
+    const supabase = await requireAdmin();
+    const safePrefix = sanitizeImagePrefix(postTitle);
+    const path = `feed/${safePrefix}-${crypto.randomUUID()}.${extensionForFile(file)}`;
+    const { error: uploadError } = await supabase.storage.from("feed-images").upload(path, file, {
+      cacheControl: "3600",
+      upsert: false
+    });
+    if (uploadError) throw uploadError;
+    const { data } = supabase.storage.from("feed-images").getPublicUrl(path);
+    return data.publicUrl;
   }
 
   async function savePost(event: React.FormEvent<HTMLFormElement>) {
@@ -119,10 +244,26 @@ export default function AdminFeedPage() {
       setError(validation);
       return;
     }
+    if (!imageFile && !isValidManualImageReference(form.image_url)) {
+      setError("La imagen debe ser una URL valida o una ruta local que empiece por /.");
+      return;
+    }
+    if (imageFile && !imageFile.type.startsWith("image/")) {
+      setError("La imagen seleccionada no es valida.");
+      return;
+    }
+    if (imageFile && imageFile.size > 5 * 1024 * 1024) {
+      setError("La imagen supera el tamaño permitido.");
+      return;
+    }
     setSaving(true);
     try {
       const supabase = await requireAdmin();
       const { data: userData } = await supabase.auth.getUser();
+      let imageUrl = normalizeFeedImageUrl(form.image_url);
+      if (imageFile) {
+        imageUrl = await uploadFeedImage(imageFile, form.title);
+      }
       const payload = {
         event_id: form.event_id || null,
         zone_id: form.zone_id || null,
@@ -133,6 +274,7 @@ export default function AdminFeedPage() {
         priority: form.priority,
         starts_at: fromDateTimeLocal(form.starts_at),
         ends_at: fromDateTimeLocal(form.ends_at),
+        image_url: imageUrl,
         cta_label: form.cta_label.trim() || null,
         cta_url: form.cta_url.trim() || null,
         is_published: form.is_published,
@@ -152,9 +294,31 @@ export default function AdminFeedPage() {
     }
   }
 
+  function handleImageFileChange(file: File | null) {
+    setImageFile(file);
+    if (file) {
+      setForm({ ...form, image_url: "" });
+    }
+  }
+
+  function handleClearImage() {
+    setImageFile(null);
+    setImageInputKey((value) => value + 1);
+    setForm({ ...form, image_url: "" });
+  }
+
   async function patchPost(id: string, patch: Partial<FeedAdminRow>) {
     setError("");
     setMessage("");
+    const currentPost = posts.find((post) => post.id === id);
+    const dateWindowError = getDateWindowError(
+      typeof patch.starts_at === "string" ? patch.starts_at : currentPost?.starts_at,
+      typeof patch.ends_at === "string" ? patch.ends_at : currentPost?.ends_at
+    );
+    if (dateWindowError) {
+      setError(dateWindowError);
+      return;
+    }
     try {
       const supabase = await requireAdmin();
       const { error: updateError } = await supabase.from("daily_feed_posts").update(patch).eq("id", id);
@@ -193,7 +357,18 @@ export default function AdminFeedPage() {
         <Card>
           <SectionTitle title={editingId ? "Editar publicacion" : "Crear publicacion"} />
           <form onSubmit={savePost}>
-            <FeedPostForm form={form} setForm={setForm} zones={zones} events={events} saving={saving} submitLabel={editingId ? "Guardar cambios" : "Crear publicacion"} />
+            <FeedPostForm
+              form={form}
+              setForm={setForm}
+              zones={zones}
+              events={events}
+              imagePreviewUrl={imagePreviewUrl}
+              imageInputKey={imageInputKey}
+              onImageFileChange={handleImageFileChange}
+              onClearImage={handleClearImage}
+              saving={saving}
+              submitLabel={editingId ? "Guardar cambios" : "Crear publicacion"}
+            />
           </form>
           <div className="mt-3">
             <AdminActionButton variant="ghost" onClick={resetForm}>Cancelar</AdminActionButton>
@@ -206,13 +381,23 @@ export default function AdminFeedPage() {
           {posts.map((post) => (
             <tr key={post.id} className="text-white">
               <td className="px-4 py-3">
-                <div className="font-bold">{post.title}</div>
-                <div className="max-w-sm text-xs text-[var(--muted)]">{post.body}</div>
+                <div className="flex items-start gap-3">
+                  <div
+                    className="h-14 w-16 shrink-0 rounded-md border border-white/10 bg-gradient-to-br from-[var(--gold)]/14 via-red-950/18 to-black bg-cover bg-center"
+                    style={post.image_url ? { backgroundImage: `linear-gradient(180deg,rgba(0,0,0,0.02),rgba(0,0,0,0.36)), url(${post.image_url})` } : undefined}
+                    aria-hidden="true"
+                  />
+                  <div className="min-w-0">
+                    <div className="font-bold">{post.title}</div>
+                    <div className="max-w-sm text-xs text-[var(--muted)]">{post.body}</div>
+                  </div>
+                </div>
               </td>
               <td className="px-4 py-3"><FeedTypeBadge type={post.type} /></td>
               <td className="px-4 py-3"><FeedPriorityBadge priority={post.priority} /></td>
               <td className="px-4 py-3">
                 <div className="flex flex-wrap gap-2">
+                  <VisibilityBadge post={post} />
                   <StatusBadge status={post.is_published ? "published" : "draft"} />
                   {post.is_pinned ? <StatusBadge status="pinned" /> : null}
                 </div>

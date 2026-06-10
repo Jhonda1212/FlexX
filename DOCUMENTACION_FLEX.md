@@ -5771,3 +5771,810 @@ No se modifico:
 - Olvidar marcar el evento como `Publicado`.
 - Dejar el evento sin fecha futura, lo que impide que aparezca como proximo evento.
 - Olvidar marcar `Destacar en home` si se espera verlo en el carrusel principal.
+
+---
+
+## Fase actual: simplificación de Admin Eventos y eliminación
+
+### Por que se agrego eliminar
+
+`/admin/events` ya permitia crear, editar, publicar, despublicar, destacar y ver eventos, pero no habia una accion clara para limpiar eventos viejos, finalizados o de prueba. Se agrego `Eliminar` en cada fila del listado para que el admin pueda mantener la gestion de eventos enfocada en eventos utiles y visibles para usuarios.
+
+### Confirmacion antes de borrar
+
+La accion usa confirmacion simple del navegador con el mensaje:
+
+```text
+¿Eliminar este evento? Esta acción no se puede deshacer.
+```
+
+No se agregaron librerias nuevas ni un sistema modal nuevo. Si el admin cancela, no se llama a la accion server-side.
+
+### Validacion admin server-side
+
+La eliminacion se ejecuta en `app/admin/events/actions.ts` como server action. Antes de borrar valida:
+
+- sesion real de Supabase Auth;
+- fila activa en `staff_profiles`;
+- rol `admin`;
+- UUID valido del evento;
+- existencia del evento.
+
+La UI no es la unica barrera de seguridad.
+
+### Eventos con registros asociados
+
+Antes de borrar, la accion revisa registros asociados en:
+
+- `tickets`;
+- `order_items`;
+- `private_room_access`;
+- `song_requests`;
+- `live_session_queue`;
+- `daily_feed_posts`.
+
+Si encuentra registros, no elimina el evento y muestra:
+
+```text
+No se puede eliminar este evento porque tiene registros asociados. Despublicalo como alternativa.
+```
+
+`event_ticket_tiers` se mantiene como dato dependiente del evento. Si el evento no tiene registros operativos asociados, la relacion `on delete cascade` existente elimina esos tiers junto con el evento.
+
+### Entradas por zona
+
+La seccion grande de `Entradas por zona` ya no se muestra por defecto. Ahora aparece como `Opciones avanzadas de entradas`:
+
+- sin evento en edicion, queda como una linea discreta;
+- al editar un evento, queda cerrada por defecto;
+- el admin puede abrirla manualmente con `Abrir`;
+- la logica de tiers existente se conserva sin tocar schema.
+
+### Que no se toco
+
+No se modifico:
+
+- migraciones;
+- Supabase schema;
+- RLS;
+- auth;
+- middleware;
+- roles;
+- subida ni render de imagenes;
+- carrusel;
+- detalle de evento;
+- proximos eventos;
+- app de usuario;
+- admin staff;
+- pagos;
+- VIP.
+
+### Como probar manualmente
+
+1. Entrar como admin a `/admin/events`.
+2. Crear un evento de prueba sin tickets, ordenes, accesos VIP, feed, canciones ni cola.
+3. Confirmar que aparece en el listado.
+4. Pulsar `Eliminar`, cancelar el confirm y verificar que sigue visible.
+5. Pulsar `Eliminar` otra vez, aceptar el confirm y verificar que desaparece del listado.
+6. Crear o elegir un evento publicado y probar `Despublicar`.
+7. Probar `Destacar` y `Quitar destacado`.
+8. Intentar eliminar un evento con registros asociados y confirmar que aparece el mensaje de bloqueo.
+9. Editar un evento y verificar que `Opciones avanzadas de entradas` esta cerrada hasta pulsar `Abrir`.
+10. Abrir `/app` y confirmar que no muestra eventos eliminados.
+
+### Pendientes
+
+- Definir mas adelante si otros flujos operativos deben ofrecer archivado historico en vez de borrado fisico.
+- Evaluar si conviene convertir la confirmacion simple en modal compartido cuando exista un patron global.
+
+---
+
+## Fase actual: rediseño visual de Hoy en FLEX
+
+### Objetivo
+
+Se rediseño `/app/today` para que el feed oficial se sienta mas vivo, comercial y util durante la noche. La pagina mantiene la misma fuente de datos (`daily_feed_posts`) y conserva el concepto de mural oficial, sin convertirlo en chat libre.
+
+### Nueva estructura visual
+
+La pantalla ahora se organiza en:
+
+- hero visual con fondo fotografico, estado `En vivo`, `Actualizado hoy`, contador de anuncios activos, fijados y agenda del dia;
+- spotlight principal de la noche, con imagen de fondo, overlay, badge de categoria, titulo, descripcion, meta info y CTA;
+- filtros por categoria como chips compactos con iconos;
+- feed de cards mas expresivas para eventos, promos, actividades, VIP, escenario y avisos;
+- sidebar simplificada con un bloque importante y un CTA comercial.
+
+### Hero
+
+El hero mantiene el titulo `Hoy en FLEX`, pero agrega:
+
+- jerarquia mas fuerte;
+- subtitulo corto orientado a marketing nocturno;
+- estado `En vivo`;
+- indicador `Actualizado hoy`;
+- resumen rapido de actividad.
+
+### Spotlight
+
+El spotlight toma primero un post fijado, luego uno urgente/alta prioridad y, si no hay publicaciones reales, usa un fallback demo coherente con FLEX. Incluye:
+
+- badge `Spotlight`;
+- categoria del post;
+- titulo;
+- descripcion corta;
+- horario o disponibilidad;
+- ubicacion;
+- prioridad;
+- CTA.
+
+### Feed y filtros
+
+Las cards del feed se rediseñaron en `components/feed/FeedPostCard.tsx`:
+
+- se reemplazo el aspecto plano por cards con icono, borde lateral dorado, badges y meta info;
+- se mantienen `cta_label`, `cta_url`, horarios, prioridad, fijado y zona;
+- se usan iconos `lucide-react`, sin dependencias nuevas;
+- los filtros siguen usando las categorias existentes y ahora se presentan como chips mas limpios.
+
+### Sidebar
+
+La columna lateral se redujo a dos bloques:
+
+- `Importante`: muestra un post fijado/urgente si existe, o una explicacion breve del feed oficial;
+- `Plan de noche`: CTA a reservar VIP y ver eventos.
+
+Se eliminaron cajitas pequeñas de menor impacto visual.
+
+### Empty states
+
+El estado vacio ahora diferencia:
+
+- no hay contenido publicado: invita a ver proximos eventos o reservar VIP;
+- no hay contenido para el filtro seleccionado: sugiere probar otra categoria.
+
+### Que no se toco
+
+No se modifico:
+
+- auth;
+- middleware;
+- roles;
+- RLS;
+- migraciones;
+- schema de Supabase;
+- logica de admin;
+- pagos;
+- carrusel del home;
+- navegacion global;
+- consultas o reglas de publicacion del feed.
+
+### Como probar manualmente
+
+1. Abrir `/app/today`.
+2. Confirmar que se ve el hero con `Hoy en FLEX`, `En vivo` y `Actualizado hoy`.
+3. Confirmar que aparece el spotlight principal.
+4. Probar filtros: Todos, Eventos, Promos, Actividades, VIP, Escenario y Avisos.
+5. Revisar que las cards muestren categoria, prioridad, horario, zona y CTA cuando existan.
+6. Verificar empty state con una categoria sin resultados.
+7. Probar responsive en mobile, laptop y desktop.
+8. Confirmar que `/admin/feed` sigue siendo la fuente de publicaciones y que no se convirtio en chat libre.
+
+### Pendientes
+
+- Definir imagenes especificas por tipo de publicacion si se agregan campos multimedia al feed.
+- Evaluar animaciones discretas adicionales cuando haya realtime real.
+
+---
+
+## Fase actual: simplificación de Hoy en FLEX
+
+### Motivo del ajuste
+
+El rediseño anterior de `/app/today` hacia que el mural oficial se sintiera mas vivo, pero tambien quedo demasiado cargado: hero con muchos indicadores, spotlight con imagen grande, contadores visibles aunque no hubiera datos y una sidebar con demasiado peso. Se simplifico para que Hoy en FLEX funcione como feed oficial claro, editorial y elegante.
+
+### Reduccion del spotlight
+
+El spotlight grande con imagen ya no aparece por defecto. Ahora:
+
+- no se muestra spotlight demo cuando no hay anuncios;
+- solo se muestra una card destacada limpia si existe un post fijado real;
+- la card destacada usa fondo sutil sin imagen grande;
+- el contenido se presenta como anuncio oficial, no como carrusel o evento.
+
+### Comportamiento con anuncios reales
+
+Cuando hay publicaciones reales en `daily_feed_posts`:
+
+- el header muestra `Hoy en FLEX`, el badge `Mural oficial` y una descripcion corta;
+- las estadisticas aparecen solo de forma compacta y solo si hay contenido;
+- si hay un post fijado, aparece arriba como destacado limpio;
+- el resto del feed se muestra en cards compactas con tipo, titulo, descripcion, hora/zona, prioridad importante y CTA si existe;
+- los filtros siguen disponibles por categoria con chips compactos y scroll horizontal en mobile;
+- la sidebar se reduce a una sola card util: `Avisos fijados primero`.
+
+### Comportamiento sin anuncios
+
+Cuando no hay publicaciones activas:
+
+- no aparece spotlight falso ni imagen grande;
+- no se muestran contadores en cero como protagonistas;
+- no se muestra sidebar;
+- aparece una sola card de empty state:
+
+```text
+La noche todavía está tranquila
+Cuando el equipo publique promociones, actividades o avisos, aparecerán aquí.
+```
+
+El empty state mantiene acciones hacia `Ver eventos` y `Reservar VIP`.
+
+### Mejoras de empty state
+
+El estado vacio ahora es mas claro y menos promocional. Tambien diferencia el caso de una categoria sin resultados, sugiriendo probar otro filtro sin llenar la pantalla con modulos extra.
+
+### Componentes modificados
+
+- `app/app/today/page.tsx`: simplifica hero, elimina spotlight demo, condiciona destacado real, compacta filtros, reduce sidebar y empty state.
+- `components/feed/FeedPostCard.tsx`: compacta las cards del mural, reduce bordes dorados, baja el tamaño tipografico y conserva metadata/CTA.
+
+### Que no se toco
+
+No se modifico:
+
+- Supabase schema;
+- migraciones;
+- RLS;
+- auth;
+- middleware;
+- roles;
+- admin;
+- consultas a `daily_feed_posts`;
+- logica de filtros;
+- carrusel de `/app`;
+- eventos;
+- VIP;
+- pagos.
+
+### Como probar manualmente
+
+1. Abrir `/app/today` sin publicaciones activas y confirmar que solo aparece el header limpio, filtros y empty state.
+2. Confirmar que no hay spotlight demo, imagen grande ni contadores en cero.
+3. Publicar un post desde `/admin/feed` y volver a `/app/today`.
+4. Confirmar que el post aparece como card limpia en el mural.
+5. Fijar un post y confirmar que aparece como destacado superior sutil.
+6. Probar filtros por categoria en desktop y mobile.
+7. Confirmar que los CTA de posts siguen funcionando.
+8. Revisar que `/app`, el carrusel, `/admin/feed`, roles y auth no cambiaron.
+
+### Pendientes
+
+- Definir si en el futuro `daily_feed_posts` tendra imagen propia por anuncio. Hasta entonces, Hoy en FLEX evita imagenes pesadas por defecto.
+
+---
+
+## Fase actual: rediseño editorial de Hoy en FLEX
+
+### Objetivo
+
+Se ajusto nuevamente `/app/today` para que deje de parecer una mini copia del home y funcione como mural editorial de anuncios, promociones y momentos comerciales de la noche.
+
+### Cambios visuales
+
+- El encabezado queda limpio: badge `Mural oficial`, titulo `Hoy en FLEX` y subtitulo breve.
+- Los filtros pasan a pills compactas, sin scrollbar visible y con scroll horizontal oculto en mobile.
+- El contenido principal ahora usa un layout editorial:
+  - una card principal destacada;
+  - hasta tres cards secundarias;
+  - imagen, badge de categoria, titulo, descripcion y CTA.
+- Si hay posts reales, se convierten en cards editoriales usando los datos de `daily_feed_posts`.
+- Si no hay posts reales, se muestran cards editoriales de apoyo para mantener una presentacion comercial sin tocar datos.
+- Debajo aparece `Avisos rápidos` solo cuando hay publicaciones reales, con cards compactas informativas.
+
+### Que se mantuvo
+
+Se mantiene:
+
+- la consulta actual a `daily_feed_posts`;
+- la logica de filtros por categoria;
+- los CTA definidos por cada post;
+- el feed oficial como mural, no chat libre.
+
+### Que no se toco
+
+No se modifico Supabase, schema, migraciones, RLS, auth, middleware, roles, admin, rutas, carrusel de `/app`, eventos, VIP ni pagos.
+
+### Como probar visualmente
+
+1. Abrir `/app/today`.
+2. Confirmar que el header no parece otro hero/carrusel.
+3. Revisar que los filtros no muestran scrollbar blanco y que `Todos` no se rompe.
+4. Confirmar que el grid editorial muestra una card principal y cards secundarias.
+5. Probar hover en cards: elevacion suave y scale minimo de imagen.
+6. Publicar posts desde `/admin/feed` y confirmar que alimentan las cards editoriales.
+7. Confirmar que `Avisos rápidos` aparece solo cuando hay posts reales.
+---
+
+## Fase actual: organización visual de Hoy en FLEX
+
+### Objetivo
+
+Se ordeno `/app/today` para que el mural visual tenga una jerarquia mas clara: primero destacados de la noche, luego secciones por categoria y finalmente un feed compacto de avisos.
+
+### Nueva estructura de destacados
+
+Cuando el filtro activo es `Todos` y hay publicaciones reales:
+
+- aparece `Destacados de la noche`;
+- se muestra una card principal grande;
+- se muestran hasta tres cards secundarias;
+- las cards usan imagen solo cuando aplica o un fondo visual elegante por categoria;
+- los CTA principales usan dorado para mantener coherencia FLEX.
+
+### Secciones por categoria
+
+Debajo de destacados, `Todos` agrupa el contenido real en secciones:
+
+- Promos;
+- Eventos;
+- Actividades;
+- VIP;
+- Escenario;
+- Avisos.
+
+Cada seccion tiene titulo, descripcion breve y grid de cards. Las categorias sin contenido no se muestran.
+
+### Comportamiento de filtros
+
+Los filtros se mantienen funcionales y ahora:
+
+- usan pills compactas;
+- evitan que `Todos` se rompa visualmente;
+- ocultan la scrollbar horizontal;
+- permiten scroll horizontal en mobile;
+- muestran solo las cards de la categoria seleccionada cuando el filtro no es `Todos`.
+
+### Mejoras de cards y CTAs
+
+Las cards editoriales tienen:
+
+- overlay menos oscuro para que la imagen o fondo respire mas;
+- badge de categoria;
+- titulo y descripcion con jerarquia mas clara;
+- CTA dorado para accion principal;
+- hover suave con elevacion y scale leve;
+- animacion `soft-enter`, que respeta `prefers-reduced-motion`.
+
+El feed compacto inferior conserva cards mas sobrias para lectura rapida.
+
+### Empty state
+
+Si no hay anuncios reales, no se muestran cards demo ni secciones vacias. Solo aparece:
+
+```text
+La noche todavía está tranquila
+Cuando el equipo publique promociones, actividades o avisos, aparecerán aquí.
+```
+
+con acciones hacia `Ver eventos` y `Reservar VIP`.
+
+### Que no se toco
+
+No se modifico:
+
+- Supabase schema;
+- migraciones;
+- RLS;
+- auth;
+- middleware;
+- roles;
+- admin/feed;
+- admin/events;
+- logica de `daily_feed_posts`;
+- carrusel del home;
+- eventos;
+- VIP;
+- pagos.
+
+### Como probar
+
+1. Abrir `/app/today`.
+2. Revisar `Todos`: destacados arriba, secciones por categoria debajo y feed compacto al final.
+3. Probar cada filtro: Promos, Eventos, Actividades, VIP, Escenario y Avisos.
+4. Verificar que los filtros no muestran scrollbar blanca y que `Todos` no se rompe.
+5. Revisar responsive en desktop, laptop y mobile.
+6. Confirmar empty state cuando no existan anuncios activos.
+
+---
+
+## Fase actual: correccion de visibilidad de Hoy en FLEX
+
+### Causa del bug
+
+`/admin/feed` mostraba una publicacion `PUBLISHED` y `PINNED`, pero `/app/today` no la mostraba porque la fila tenia una ventana de fechas vencida:
+
+- `starts_at`: `2022-02-22 21:22:00+00`;
+- `ends_at`: `2022-02-23 01:22:00+00`.
+
+La tabla `daily_feed_posts` y su RLS solo consideran visible una publicacion cuando:
+
+- `is_published = true`;
+- `starts_at` es `null` o `starts_at <= now()`;
+- `ends_at` es `null` o `ends_at >= now()`.
+
+Por eso una publicacion puede verse publicada y fijada en admin, pero no aparecer para usuarios si ya vencio.
+
+### Campos reales de daily_feed_posts
+
+`/admin/feed` guarda y lista:
+
+- `title`;
+- `body`;
+- `type`;
+- `priority`;
+- `starts_at`;
+- `ends_at`;
+- `cta_label`;
+- `cta_url`;
+- `is_published`;
+- `is_pinned`;
+- `event_id`;
+- `zone_id`.
+
+No existe `status`, `category`, `pinned` ni `context_label` en el schema actual.
+
+### Ajuste en /app/today
+
+`/app/today` ahora:
+
+- consulta publicaciones con `is_published = true`;
+- aplica en cliente la regla explicita de ventana `starts_at` / `ends_at` sobre las filas accesibles;
+- mantiene el orden por `is_pinned`, `starts_at` y `created_at`;
+- registra en desarrollo un `console.info` si hay publicaciones publicadas accesibles, pero ninguna esta activa por fecha;
+- muestra un error generico al usuario si falla la carga y deja el detalle tecnico solo en `console.error` de desarrollo.
+
+La RLS existente sigue protegiendo la lectura publica de publicaciones vencidas para usuarios normales.
+
+### Reglas de categorias
+
+Se normalizaron aliases para evitar que diferencias de idioma impidan renderizar o filtrar:
+
+- `event`, `evento`, `eventos`;
+- `promotion`, `promo`, `promos`;
+- `activity`, `actividad`, `actividades`;
+- `vip`;
+- `stage`, `escenario`;
+- `announcement`, `notice`, `aviso`, `avisos`;
+- `storage`, `guardarropa`;
+- `security`, `seguridad`.
+
+### Que no se toco
+
+No se modifico:
+
+- Supabase schema;
+- migraciones;
+- RLS;
+- auth;
+- middleware;
+- roles;
+- admin/feed visual;
+- admin/events;
+- carrusel del home;
+- pagos.
+
+### Como probar
+
+1. Crear una publicacion en `/admin/feed`.
+2. Marcarla como `Publicado` y `Fijado`.
+3. Dejar `starts_at` y `ends_at` vacios, o usar una fecha actual/futura no vencida.
+4. Abrir `/app/today` y revisar `Todos`.
+5. Probar el filtro correspondiente, por ejemplo `Actividades`.
+6. Cambiar `ends_at` a una fecha pasada y confirmar que deja de aparecer.
+
+---
+
+## Fase actual: validacion de fechas y visibilidad en Admin Feed
+
+### Causa exacta
+
+`/admin/feed` permitia guardar publicaciones con `ends_at` anterior o igual a `starts_at`. En ese estado la publicacion podia verse como `PUBLISHED` y `PINNED` en admin, pero `/app/today` no la mostraba porque la ventana de fechas nunca estaba activa para usuarios.
+
+### Validacion agregada
+
+En crear y editar publicaciones se valida que, si existen `starts_at` y `ends_at`, la fecha de fin sea posterior a la fecha de inicio. Si no se cumple, no se guarda y se muestra:
+
+```text
+La fecha de fin debe ser posterior a la fecha de inicio.
+```
+
+La misma regla se revisa antes de acciones rapidas del listado para evitar publicar o modificar una publicacion con una ventana invalida.
+
+### Badges de visibilidad
+
+El listado de `/admin/feed` muestra un badge operativo:
+
+- `VISIBLE AHORA`: publicada y dentro de la ventana de fechas;
+- `PROGRAMADA`: publicada con `starts_at` futuro;
+- `VENCIDA`: publicada con `ends_at` pasado;
+- `SIN PUBLICAR`: `is_published = false`.
+
+Esto no cambia la publicacion por si solo; solo explica por que aparece o no aparece en `/app/today`.
+
+### Helper del formulario
+
+El formulario ahora aclara:
+
+```text
+Deja las fechas vacías para mostrarlo inmediatamente sin expiración. Si usas fecha de fin, debe ser posterior al inicio.
+```
+
+### Confirmacion de /app/today
+
+No se redisenio `/app/today`. La pantalla sigue mostrando publicaciones que cumplen:
+
+- `is_published = true`;
+- `starts_at` es `null` o `starts_at <= now()`;
+- `ends_at` es `null` o `ends_at >= now()`.
+
+### Que no se toco
+
+No se modifico:
+
+- Supabase schema;
+- migraciones;
+- RLS;
+- auth;
+- middleware;
+- roles;
+- admin/events;
+- carrusel del home;
+- pagos.
+
+### Como probar
+
+1. Abrir `/admin/feed`.
+2. Crear o editar una publicacion con `starts_at` posterior a `ends_at`.
+3. Confirmar que aparece el error y no se guarda.
+4. Crear una publicacion publicada sin fechas y confirmar badge `VISIBLE AHORA`.
+5. Crear una publicacion publicada con `starts_at` futuro y confirmar badge `PROGRAMADA`.
+6. Editar una publicacion publicada con `ends_at` pasado y confirmar badge `VENCIDA`.
+7. Abrir `/app/today` y confirmar que solo aparecen publicaciones publicadas dentro de la ventana activa.
+
+---
+
+## Fase actual: limpieza de fechas en Admin Feed
+
+### Problema de UX
+
+Los inputs `datetime-local` del formulario de `/admin/feed` podian quedar en un estado invalido del navegador al intentar borrar la fecha manualmente. En ese caso el navegador bloqueaba el envio con `Debes introducir un valor válido`, aunque la intencion del admin fuera dejar la fecha vacia.
+
+### Ajuste aplicado
+
+Se agregaron botones pequenos `Limpiar` junto a:
+
+- `Inicio`;
+- `Fin`.
+
+Al pulsarlos, el valor controlado queda como `""`. En el guardado, `fromDateTimeLocal` convierte ese valor a `null`, por lo que la publicacion queda sin inicio o sin expiracion.
+
+### Helper dinamico
+
+Cuando `starts_at` y `ends_at` estan vacios, el formulario muestra:
+
+```text
+Visible inmediatamente y sin expiración.
+```
+
+Si alguna fecha esta presente, mantiene la ayuda general sobre dejar fechas vacias y usar fin posterior al inicio.
+
+### Reglas conservadas
+
+Se mantiene la validacion:
+
+- si `starts_at` y `ends_at` existen, `ends_at` debe ser posterior a `starts_at`;
+- una publicacion publicada sin ventana invalida se marca como `VISIBLE AHORA`;
+- `starts_at` futuro se marca como `PROGRAMADA`;
+- `ends_at` pasado se marca como `VENCIDA`.
+
+### Que no se toco
+
+No se modifico:
+
+- Supabase schema;
+- migraciones;
+- RLS;
+- auth;
+- middleware;
+- roles;
+- `/app/today` visual;
+- admin/events.
+
+### Como probar
+
+1. Abrir `/admin/feed`.
+2. Editar una publicacion con fechas.
+3. Pulsar `Limpiar` en `Inicio` y `Fin`.
+4. Confirmar que aparece `Visible inmediatamente y sin expiración.`
+5. Guardar la publicacion.
+6. Confirmar que el listado muestra `VISIBLE AHORA` si esta publicada.
+7. Abrir `/app/today` y confirmar que la publicacion aparece.
+
+---
+
+## Fase actual: corrección de carga de Hoy en FLEX con image_url
+
+### Causa del error
+
+`/app/today` consultaba `daily_feed_posts.image_url`, pero la base local todavia no tenia aplicada la migracion que agrega esa columna. Supabase/PostgREST devolvia error de columna inexistente y la pantalla mostraba el mensaje generico de carga.
+
+Se confirmo en la base local:
+
+- `public.events` ya tenia `image_url` y `cover_image_path`;
+- `public.daily_feed_posts` no tenia `image_url` antes de aplicar la migracion;
+- la relacion `daily_feed_posts_event_id_fkey` existe, por lo que el join con `events` es valido.
+
+### Migracion aplicada
+
+Se mantiene la migracion incremental:
+
+```sql
+alter table public.daily_feed_posts
+  add column if not exists image_url text;
+```
+
+Se aplico con:
+
+```bash
+supabase migration up
+```
+
+No se ejecuto `supabase db reset`.
+
+### Consulta de /app/today
+
+La consulta de `/app/today` sigue leyendo:
+
+- posts publicados;
+- ventana activa `starts_at` / `ends_at`;
+- `post.image_url`;
+- imagen del evento vinculado mediante `events(title, image_url, cover_image_path)`.
+
+La prioridad visual se mantiene:
+
+1. `post.image_url`;
+2. `event.image_url` o `event.cover_image_path`;
+3. fallback visual por categoria.
+
+### Debug en desarrollo
+
+El `console.error` de desarrollo ahora muestra un objeto con:
+
+- `message`;
+- `details`;
+- `hint`;
+- `code`.
+
+En produccion no se deja logging ruidoso y el usuario solo ve un mensaje generico si falla la carga.
+
+### Que no se toco
+
+No se modifico:
+
+- diseño de tarjetas;
+- selector interactivo;
+- admin/events;
+- auth;
+- middleware;
+- roles;
+- RLS;
+- migraciones antiguas;
+- carrusel del home.
+
+### Como probar
+
+1. Abrir `/admin/feed`.
+2. Crear una publicacion con `image_url` vacio.
+3. Crear una publicacion con `/images/feed/test.jpg`.
+4. Abrir `/app/today`.
+5. Confirmar que no crashea.
+6. Confirmar que la publicacion sin imagen usa fallback visual.
+7. Confirmar que la publicacion con imagen intenta mostrar la ruta indicada.
+
+---
+
+## Fase actual: subida de imágenes en Admin Feed
+
+### Columna nueva
+
+Se agrego una migracion incremental para `daily_feed_posts`:
+
+```sql
+image_url text null
+```
+
+No se modificaron migraciones antiguas ni RLS. La columna queda cubierta por las politicas existentes de lectura y gestion de `daily_feed_posts`.
+
+### Bucket usado
+
+Se agrego el bucket publico `feed-images` con politicas para:
+
+- lectura publica;
+- insercion, actualizacion y borrado solo para admin activo.
+
+### Flujo en `/admin/feed`
+
+El formulario de crear/editar publicaciones ahora prioriza la subida por archivo:
+
+- selector `input type="file"`;
+- preview visual inmediata;
+- boton `Quitar imagen`;
+- campo manual opcional como respaldo.
+
+Formatos recomendados:
+
+- JPG;
+- PNG;
+- WebP.
+
+Tamano maximo:
+
+- 5 MB.
+
+Si el admin pega una ruta manual:
+
+- `images/feed/archivo.jpg` se normaliza a `/images/feed/archivo.jpg`;
+- `public/images/feed/archivo.jpg` se normaliza a `/images/feed/archivo.jpg`;
+- URLs `http://` y `https://` se conservan;
+- strings vacios se guardan como `null`.
+
+Al subir un archivo:
+
+- se guarda en `feed-images`;
+- se genera un nombre unico con prefijo seguro;
+- se guarda la URL publica resultante en `daily_feed_posts.image_url`.
+
+### Prioridad de imagen en `/app/today`
+
+Las publicaciones del mural usan:
+
+1. `post.image_url`;
+2. `event.image_url` o `event.cover_image_path` cuando la publicacion esta vinculada a un evento;
+3. fallback visual por categoria.
+
+Si una publicacion VIP, Promo, Actividad, Escenario o Aviso tiene imagen propia, esa imagen se muestra en las cards editoriales y en el feed compacto. Si no hay imagen, no se muestra icono roto: queda el fondo degradado FLEX.
+
+### Listado admin
+
+El listado de `/admin/feed` muestra una miniatura discreta en la columna de publicacion. Si no hay `image_url`, se muestra un placeholder visual sutil sin hacer la tabla pesada.
+
+### Pendiente
+
+En esta fase no se borra automaticamente la imagen anterior del storage cuando una publicacion se reemplaza o se elimina. Eso queda pendiente para una fase posterior si se quiere limpiar el bucket.
+
+### Que no se toco
+
+No se modifico:
+
+- auth;
+- middleware;
+- roles;
+- RLS;
+- migraciones antiguas;
+- admin/events;
+- carrusel del home;
+- pagos;
+- VIP;
+- tickets.
+
+### Como probar
+
+1. Aplicar la migracion nueva en el entorno correspondiente.
+2. Crear una publicacion VIP desde `/admin/feed` seleccionando una imagen local.
+3. Crear una publicacion Promo con una imagen local diferente.
+4. Editar una publicacion y cambiar la imagen.
+5. Quitar la imagen y guardar.
+6. Abrir `/app/today` y revisar `Todos`.
+7. Revisar filtro `VIP`.
+8. Revisar filtro `Promos`.
+9. Confirmar que las publicaciones sin imagen usan fallback visual y que no aparece imagen rota.
