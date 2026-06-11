@@ -36,6 +36,13 @@ type FeedAdminRow = {
   events?: { title?: string | null; image_url?: string | null; cover_image_path?: string | null } | null;
 };
 
+const seedEventTitles = new Set([
+  "Flex Live Sessions: Jazz Night",
+  "Jazz Nights",
+  "Latin Urban Night",
+  "Reggaeton Classics"
+]);
+
 function normalizeFeedImageUrl(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -79,7 +86,7 @@ function toForm(post: FeedAdminRow): FeedPostFormState {
     type: post.type,
     priority: post.priority,
     zone_id: post.zone_id ?? "",
-    event_id: post.event_id ?? "",
+    event_id: post.type === "event" ? post.event_id ?? "" : "",
     starts_at: isoInputValue(post.starts_at),
     ends_at: isoInputValue(post.ends_at),
     image_url: post.image_url ?? "",
@@ -140,10 +147,18 @@ function VisibilityBadge({ post }: { post: FeedAdminRow }) {
   );
 }
 
+function contextLabelForPost(post: FeedAdminRow) {
+  if (post.type === "event") return post.events?.title ?? "Evento pendiente";
+  return post.club_zones?.name ?? "-";
+}
+
 function validateForm(form: FeedPostFormState) {
   if (!form.title.trim()) return "El titulo es obligatorio.";
   if (!(feedTypes as readonly string[]).includes(form.type)) return "Tipo de publicacion invalido.";
   if (!(feedPriorities as readonly string[]).includes(form.priority)) return "Prioridad invalida.";
+  if (form.type === "event" && !form.event_id) {
+    return "Los anuncios de evento deben vincularse a un evento creado en /admin/events.";
+  }
   if (form.cta_url && !form.cta_url.startsWith("/") && !form.cta_url.startsWith("https://")) {
     return "La URL del CTA debe empezar con / o con https://.";
   }
@@ -183,7 +198,7 @@ export default function AdminFeedPage() {
     if (eventResult.error) throw eventResult.error;
     setPosts((postResult.data ?? []) as FeedAdminRow[]);
     setZones((zoneResult.data ?? []) as Array<{ id: string; name: string }>);
-    setEvents((eventResult.data ?? []) as Array<{ id: string; title: string }>);
+    setEvents(((eventResult.data ?? []) as Array<{ id: string; title: string }>).filter((event) => !seedEventTitles.has(event.title)));
   }
 
   useEffect(() => {
@@ -265,7 +280,7 @@ export default function AdminFeedPage() {
         imageUrl = await uploadFeedImage(imageFile, form.title);
       }
       const payload = {
-        event_id: form.event_id || null,
+        event_id: form.type === "event" ? form.event_id || null : null,
         zone_id: form.zone_id || null,
         created_by: userData.user?.id ?? null,
         title: form.title.trim(),
@@ -317,6 +332,10 @@ export default function AdminFeedPage() {
     );
     if (dateWindowError) {
       setError(dateWindowError);
+      return;
+    }
+    if (patch.is_published === true && currentPost?.type === "event" && !currentPost.event_id) {
+      setError("No se puede publicar un anuncio de evento sin vincularlo a un evento real.");
       return;
     }
     try {
@@ -402,7 +421,7 @@ export default function AdminFeedPage() {
                   {post.is_pinned ? <StatusBadge status="pinned" /> : null}
                 </div>
               </td>
-              <td className="px-4 py-3 text-xs text-[var(--muted)]">{post.club_zones?.name ?? post.events?.title ?? "-"}</td>
+              <td className="px-4 py-3 text-xs text-[var(--muted)]">{contextLabelForPost(post)}</td>
               <td className="px-4 py-3">{new Date(post.created_at).toLocaleString("es-ES")}</td>
               <td className="px-4 py-3">
                 <div className="flex flex-wrap gap-2">

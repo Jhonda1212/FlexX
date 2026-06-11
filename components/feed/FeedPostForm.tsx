@@ -34,6 +34,24 @@ export const emptyFeedPostForm: FeedPostFormState = {
   is_pinned: false
 };
 
+const feedTypeLabels: Record<string, string> = {
+  event: "Evento",
+  promotion: "Promo",
+  vip: "VIP",
+  activity: "Actividad",
+  stage: "Escenario",
+  announcement: "Aviso"
+};
+
+function ctaHelpForType(type: string) {
+  if (type === "event") return "Destino por defecto: Ver evento -> /app/events/[event_id]. Los anuncios de evento deben vincularse a un evento creado en /admin/events.";
+  if (type === "vip") return "Destino por defecto: Reservar VIP -> /app/vip. Puedes asociar una sala VIP como contexto visual.";
+  if (type === "stage") return "Destino por defecto: Participar -> /app/my-turn.";
+  if (type === "promotion") return "Destino opcional: Ver promo usa la URL manual si existe. Si no hay URL, no se muestra boton.";
+  if (type === "activity") return "Destino opcional: Ver actividad usa la URL manual si existe. Si no hay URL, no se muestra boton.";
+  return "Destino opcional: Mas informacion usa la URL manual si existe. Si no hay URL, no se muestra boton.";
+}
+
 function previewImageUrl(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return "";
@@ -68,13 +86,22 @@ export function FeedPostForm({
   const datesAreEmpty = !form.starts_at && !form.ends_at;
   const manualImagePreviewUrl = previewImageUrl(form.image_url);
   const activeImagePreviewUrl = imagePreviewUrl || manualImagePreviewUrl;
+  const isEventPost = form.type === "event";
 
   return (
     <div className="grid gap-3 md:grid-cols-2">
       <input className="rounded-md border border-white/10 bg-black/40 px-4 py-3 text-white" placeholder="Titulo" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
-      <select className="rounded-md border border-white/10 bg-black/40 px-4 py-3 text-white" value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}>
-        {feedTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+      <select
+        className="rounded-md border border-white/10 bg-black/40 px-4 py-3 text-white"
+        value={form.type}
+        onChange={(event) => {
+          const nextType = event.target.value;
+          setForm({ ...form, type: nextType, event_id: nextType === "event" ? form.event_id : "" });
+        }}
+      >
+        {feedTypes.map((type) => <option key={type} value={type}>{feedTypeLabels[type] ?? type}</option>)}
       </select>
+      <p className="text-xs leading-5 text-[var(--muted)] md:col-span-2">{ctaHelpForType(form.type)}</p>
       <select className="rounded-md border border-white/10 bg-black/40 px-4 py-3 text-white" value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}>
         {feedPriorities.map((priority) => <option key={priority} value={priority}>{priority}</option>)}
       </select>
@@ -82,10 +109,18 @@ export function FeedPostForm({
         <option value="">Sin zona</option>
         {zones.map((zone) => <option key={zone.id} value={zone.id}>{zone.name}</option>)}
       </select>
-      <select className="rounded-md border border-white/10 bg-black/40 px-4 py-3 text-white" value={form.event_id} onChange={(event) => setForm({ ...form, event_id: event.target.value })}>
-        <option value="">Sin evento</option>
-        {events.map((event) => <option key={event.id} value={event.id}>{event.title}</option>)}
-      </select>
+      {isEventPost ? (
+        <label className="space-y-2 md:col-span-2">
+          <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Evento real vinculado</span>
+          <select className="w-full rounded-md border border-[var(--gold)]/30 bg-black/40 px-4 py-3 text-white" value={form.event_id} onChange={(event) => setForm({ ...form, event_id: event.target.value })}>
+            <option value="">Selecciona un evento creado en /admin/events</option>
+            {events.map((event) => <option key={event.id} value={event.id}>{event.title}</option>)}
+          </select>
+          <span className="block text-xs leading-5 text-[var(--muted)]">
+            Los anuncios de evento deben vincularse a un evento creado en /admin/events.
+          </span>
+        </label>
+      ) : null}
       <label className="space-y-2">
         <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Inicio</span>
         <div className="flex gap-2">
@@ -157,8 +192,11 @@ export function FeedPostForm({
           </div>
         </div>
       </div>
-      <input className="rounded-md border border-white/10 bg-black/40 px-4 py-3 text-white" placeholder="CTA label" value={form.cta_label} onChange={(event) => setForm({ ...form, cta_label: event.target.value })} />
-      <input className="rounded-md border border-white/10 bg-black/40 px-4 py-3 text-white" placeholder="CTA URL (/app/vip o https://...)" value={form.cta_url} onChange={(event) => setForm({ ...form, cta_url: event.target.value })} />
+      <input className="rounded-md border border-white/10 bg-black/40 px-4 py-3 text-white" placeholder="CTA label opcional" value={form.cta_label} onChange={(event) => setForm({ ...form, cta_label: event.target.value })} />
+      <input className="rounded-md border border-white/10 bg-black/40 px-4 py-3 text-white" placeholder="CTA URL opcional: /app/vip, /app/my-turn, /app/tickets o https://..." value={form.cta_url} onChange={(event) => setForm({ ...form, cta_url: event.target.value })} />
+      <p className="text-xs leading-5 text-[var(--muted)] md:col-span-2">
+        Ejemplos: /app/vip, /app/my-turn, /app/tickets. Usa /app/events/[id] solo para publicaciones tipo evento.
+      </p>
       <textarea className="min-h-28 rounded-md border border-white/10 bg-black/40 px-4 py-3 text-white md:col-span-2" placeholder="Mensaje" value={form.body} onChange={(event) => setForm({ ...form, body: event.target.value })} />
       <label className="flex items-center gap-3 text-sm font-bold text-white"><input type="checkbox" checked={form.is_published} onChange={(event) => setForm({ ...form, is_published: event.target.checked })} /> Publicado</label>
       <label className="flex items-center gap-3 text-sm font-bold text-white"><input type="checkbox" checked={form.is_pinned} onChange={(event) => setForm({ ...form, is_pinned: event.target.checked })} /> Fijado</label>

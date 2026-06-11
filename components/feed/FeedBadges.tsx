@@ -1,4 +1,4 @@
-export const feedTypes = ["event", "promotion", "activity", "announcement", "vip", "stage", "security", "storage"] as const;
+export const feedTypes = ["event", "promotion", "vip", "activity", "stage", "announcement"] as const;
 export const feedPriorities = ["low", "normal", "high", "urgent"] as const;
 
 export type FeedPostType = typeof feedTypes[number];
@@ -10,12 +10,10 @@ const typeLabels: Record<FeedPostType, string> = {
   activity: "Actividad",
   announcement: "Aviso",
   vip: "VIP",
-  stage: "Escenario",
-  security: "Seguridad",
-  storage: "Storage"
+  stage: "Escenario"
 };
 
-const typeIcons: Record<FeedPostType, string> = {
+const typeIcons: Record<string, string> = {
   event: "🎷",
   promotion: "🍸",
   activity: "🎤",

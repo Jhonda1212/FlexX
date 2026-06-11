@@ -6578,3 +6578,621 @@ No se modifico:
 7. Revisar filtro `VIP`.
 8. Revisar filtro `Promos`.
 9. Confirmar que las publicaciones sin imagen usan fallback visual y que no aparece imagen rota.
+
+---
+
+## Fase actual: normalizacion Supabase local entre computadores
+
+### Diagnostico
+
+El problema de sincronizacion entre computadores no era GitHub ni Next.js. Git solo mueve codigo y archivos versionados. Las tablas, columnas, buckets, policies y datos creados manualmente en Supabase Studio local viven dentro del Docker/local Postgres de cada computador y no viajan a otro equipo.
+
+Por eso una maquina podia tener `daily_feed_posts.image_url`, publicaciones, zonas o eventos creados manualmente, mientras otra maquina solo tenia lo que existia en `supabase/migrations`. Cuando la app consultaba `/app/today`, `/admin/feed` u otras secciones contra una base local incompleta, aparecian errores de tabla/columna/datos faltantes.
+
+### Auditoria de estructura
+
+Las tablas principales estan versionadas en migraciones:
+
+- `profiles`
+- `staff_profiles`
+- `club_zones`
+- `events`
+- `event_ticket_tiers`
+- `tickets`
+- `private_room_access`
+- `private_room_guests`
+- `song_requests`
+- `live_session_queue`
+- `notifications`
+- `storage_items`
+- `access_logs`
+- `orders`
+- `order_items`
+- `daily_feed_posts`
+
+Tambien esta versionado:
+
+- `daily_feed_posts.image_url` en `supabase/migrations/20260610120000_daily_feed_posts_image_url.sql`.
+- bucket publico `event-images` en `supabase/migrations/20260603120000_event_media_admin_fields.sql`.
+- bucket publico `feed-images` en `supabase/migrations/20260610123000_feed_images_bucket.sql`.
+- RLS y policies principales para tablas operativas y storage.
+
+No se modificaron migraciones antiguas y no se borro ninguna migracion.
+
+### Seed versionado
+
+Se agrego `supabase/seed.sql` para reconstruir datos base en cualquier computador despues de aplicar migraciones.
+
+Datos obligatorios versionados:
+
+- `club_zones`:
+  - Entrada Principal
+  - Pista Principal
+  - Bar Principal
+  - Escenario
+  - Guardarropa / Storage
+  - Banos
+  - Sala Negra
+  - Sala Roja
+  - Sala Dorada
+
+Datos demo opcionales versionados:
+
+- eventos demo/base:
+  - Flex Live Sessions: Jazz Night
+  - Jazz Nights
+  - Latin Urban Night
+  - Reggaeton Classics
+- tiers base para esos eventos en `event_ticket_tiers`.
+- publicaciones demo de Hoy en FLEX en `daily_feed_posts`:
+  - Live Jazz Session
+  - 2x1 en cocteles
+  - Open Mic
+  - Ultimos cupos VIP
+
+El seed es idempotente:
+
+- actualiza datos existentes por nombre/titulo cuando ya existen;
+- inserta solo lo que falta;
+- usa UUIDs fijos para datos base/demo;
+- usa `on conflict (id)` como proteccion adicional;
+- no crea usuarios Auth;
+- no guarda contrasenas;
+- no contiene datos personales reales.
+
+### Usuario admin local
+
+El seed no crea usuario admin porque los usuarios pertenecen a Supabase Auth y no conviene commitear credenciales ni contrasenas.
+
+Flujo recomendado para admin local:
+
+1. Crear un usuario desde `/register` o Supabase Studio Auth.
+2. Promover ese usuario con un snippet local controlado, por ejemplo `supabase/snippets/promote_existing_user_to_admin.sql`, ajustando email y rol.
+3. Verificar que exista fila activa en `staff_profiles` con `role = 'admin'`.
+
+### Flujo para cambiar de computador
+
+Comandos base:
+
+```bash
+git pull
+npm install
+npx supabase start
+npx supabase db reset
+npm run dev
+```
+
+Advertencia importante:
+
+`npx supabase db reset` destruye y recrea la base local. En local borra datos de `auth.users`, `profiles`, `staff_profiles` y cualquier dato operativo creado en Studio. Solo debe ejecutarse cuando se acepta perder/recrear esos datos locales.
+
+Antes de resetear:
+
+1. Guardar cualquier cambio de estructura como nueva migracion.
+2. Guardar cualquier dato base necesario en `supabase/seed.sql`.
+3. Exportar datos locales importantes si no se quieren perder.
+
+Los datos creados manualmente en Supabase Studio no viajan a otro computador. Toda estructura debe estar en `supabase/migrations` y todo dato base debe estar en `supabase/seed.sql`.
+
+### Comandos utiles Supabase
+
+Crear migracion:
+
+```bash
+npx supabase migration new nombre
+```
+
+Aplicar migraciones local sin reset:
+
+```bash
+npx supabase migration up
+```
+
+Reset local destructivo:
+
+```bash
+npx supabase db reset
+```
+
+Ver estado de migraciones:
+
+```bash
+npx supabase migration list
+```
+
+Generar dump de datos antes de reset:
+
+```bash
+npx supabase db dump --local --data-only > backup-local.sql
+```
+
+### Checklist de seguridad
+
+- Nunca commitear `.env.local`.
+- Mantener `.env.example` sin secretos reales.
+- No usar `service_role` en cliente.
+- No meter datos reales o personales en `supabase/seed.sql`.
+- No depender de datos creados manualmente en Supabase Studio.
+- No ejecutar `supabase db reset` sin confirmar que se acepta perder la base local.
+- No borrar ni reescribir migraciones antiguas para corregir una base local.
+
+### Como probar
+
+En un computador nuevo o base local descartable:
+
+1. Ejecutar `git pull`.
+2. Ejecutar `npm install`.
+3. Ejecutar `npx supabase start`.
+4. Si se acepta perder datos locales, ejecutar `npx supabase db reset`.
+5. Crear o registrar usuario local.
+6. Promover el usuario a admin si se necesita acceder a `/admin`.
+7. Ejecutar `npm run dev`.
+8. Abrir `/app/today` y confirmar publicaciones base.
+9. Abrir `/admin/feed` con admin activo y confirmar que carga sin error de columna `image_url`.
+10. Abrir `/app/events` y confirmar eventos/tiers demo.
+
+### Pendiente
+
+- Validar el flujo completo en una base local reseteada solo con confirmacion explicita.
+- Decidir si se versiona `supabase/config.toml`. En este repo no aparece actualmente; agregarlo puede cambiar la identidad local de contenedores Supabase existentes, por eso no se creo automaticamente en esta fase.
+- Definir si los datos demo deben mantenerse siempre activos o moverse a un seed opcional separado en una fase posterior.
+- Limpiar o reemplazar snippets antiguos que contengan pruebas locales no reutilizables.
+
+---
+
+## Fase actual: modelo conceptual de Hoy en FLEX como mural de marketing
+
+### Problema corregido
+
+Hoy en FLEX estaba funcionando de forma ambigua: una publicacion tipo `event` podia terminar vinculada a eventos demo/base y `/app/today` generaba botones tipo `Ver evento` aunque la tarjeta fuera realmente una promo, aviso o anuncio independiente.
+
+Eso generaba confusion porque el feed no debe ser la fuente principal de entidades. Los eventos reales se crean y administran en `/admin/events`. El feed solo promociona, anuncia o dirige a acciones concretas ya existentes.
+
+### Nueva regla de negocio
+
+- `/admin/events` crea eventos reales.
+- `/admin/feed` solo publica piezas de marketing, avisos o accesos directos.
+- Una publicacion tipo `event` debe estar vinculada a un evento real existente.
+- Si una publicacion no es tipo `event`, no usa `event_id` para navegar.
+- Las publicaciones de Hoy no deben mandar a eventos demo/base del seed por accidente.
+- El CTA se calcula por tipo de publicacion y por URL manual cuando exista.
+
+### Reglas de CTA por tipo
+
+Prioridad general:
+
+1. Si existe `cta_url` manual, se usa como destino.
+2. Si `type = event` y existe `event_id` real, se usa `/app/events/[event_id]`.
+3. Si `type = vip`, se usa `/app/vip`.
+4. Si `type = stage`, se usa `/app/my-turn`.
+5. Si `type = promotion`, `activity` o `announcement` no tienen `cta_url`, no se muestra boton.
+6. Nunca se usa `event_id` si `type` no es `event`.
+
+Labels por defecto:
+
+- `event`: `Ver evento`
+- `vip`: `Reservar VIP`
+- `promotion`: `Ver promo`
+- `stage`: `Participar`
+- `activity`: `Ver actividad`
+- `announcement`: `Mas informacion` solo cuando tiene CTA manual.
+
+### Como funciona `event_id`
+
+En `/admin/feed`, el selector de evento solo aparece cuando el tipo es `event`.
+
+Si el usuario cambia una publicacion de `event` a otro tipo, el formulario limpia `event_id`. Al guardar, cualquier tipo distinto de `event` envia `event_id = null`.
+
+Para tipo `event`, guardar sin evento vinculado muestra error:
+
+```text
+Los anuncios de evento deben vincularse a un evento creado en /admin/events.
+```
+
+El selector de eventos del feed excluye los eventos demo/base conocidos del seed para evitar enlaces accidentales desde Hoy en FLEX.
+
+### Comportamiento por tipo
+
+- `event`: exige evento real vinculado; CTA por defecto a `/app/events/[event_id]`.
+- `promotion`: no usa evento; usa `cta_url` si existe; si no, no muestra boton. A futuro puede existir `/admin/promos`.
+- `vip`: no usa evento; CTA por defecto a `/app/vip`; `zone_id` puede dar contexto visual de sala.
+- `stage`: no usa evento; CTA por defecto a `/app/my-turn`.
+- `activity`: no usa evento salvo que se convierta explicitamente en `event`; usa `cta_url` si existe; si no, no muestra boton.
+- `announcement`: no usa evento; CTA opcional; si no hay `cta_url`, no muestra boton.
+
+### Archivos modificados
+
+- `app/admin/feed/page.tsx`
+- `app/app/today/page.tsx`
+- `components/feed/FeedPostCard.tsx`
+- `components/feed/FeedPostForm.tsx`
+- `components/feed/FeedBadges.tsx`
+- `DOCUMENTACION_FLEX.md`
+
+### Que no se toco
+
+No se modifico:
+
+- auth;
+- middleware;
+- roles;
+- RLS;
+- pagos;
+- Stripe;
+- carrusel del home;
+- migraciones antiguas;
+- seed de Supabase.
+
+No se ejecuto `supabase db reset`.
+
+### Como probar
+
+1. Abrir `/admin/feed`.
+2. Crear publicacion tipo `event` sin seleccionar evento y confirmar que no permite guardar.
+3. Crear publicacion tipo `event` con evento real de `/admin/events` y confirmar que el CTA manda a `/app/events/[event_id]`.
+4. Crear publicacion tipo `vip` sin CTA manual y confirmar en `/app/today` que el boton dice `Reservar VIP` y manda a `/app/vip`.
+5. Crear publicacion tipo `stage` sin CTA manual y confirmar que el boton dice `Participar` y manda a `/app/my-turn`.
+6. Crear publicacion tipo `promotion` sin CTA manual y confirmar que no aparece boton.
+7. Crear publicacion tipo `promotion` con `cta_url` y confirmar que usa esa URL.
+8. Editar una publicacion de `event` a `vip` y confirmar que ya no conserva ni usa `event_id`.
+
+---
+
+## Fase actual: rails horizontales en Hoy en FLEX
+
+### Objetivo
+
+Se ajusto `/app/today` para que el mural no acumule tarjetas verticalmente cuando hay muchas publicaciones. Las secciones ahora se presentan como filas horizontales tipo catalogo premium, con scroll-snap, swipe natural en mobile y flechas discretas en desktop.
+
+### Nuevo componente
+
+Se creo `components/feed/FeedRail.tsx`.
+
+Recibe:
+
+- `title`
+- `subtitle`
+- `posts`
+- `variant`: `featured`, `standard` o `compact`
+
+El rail:
+
+- renderiza una fila horizontal de tarjetas;
+- usa `scroll-snap` para que cada tarjeta encaje al desplazarse;
+- oculta scrollbars nativas;
+- evita overflow horizontal global;
+- muestra flechas izquierda/derecha en desktop;
+- permite swipe horizontal natural en mobile;
+- usa `aria-label="Ver tarjetas anteriores"` y `aria-label="Ver más tarjetas"`;
+- respeta `prefers-reduced-motion` usando desplazamiento inmediato cuando corresponde.
+
+### Tarjetas
+
+`components/feed/FeedPostCard.tsx` ahora acepta variantes visuales:
+
+- `list`: comportamiento compacto anterior;
+- `featured`: tarjeta amplia para destacados;
+- `standard`: tarjeta media para rails por categoria;
+- `compact`: tarjeta reducida para avisos rapidos.
+
+La logica de CTA por tipo se mantiene centralizada en `getFeedPostCta(post)`. No se cambio la consulta a `daily_feed_posts` ni el modelo de datos.
+
+### Organizacion de `/app/today`
+
+En filtro `Todos`:
+
+1. Rail `Destacados de la noche` con variante `featured`.
+2. Rails por categoria cuando existan posts:
+   - `Promos`
+   - `Eventos`
+   - `Actividades`
+   - `VIP`
+   - `Escenario`
+   - `Avisos`
+3. Rail compacto `Avisos rapidos`.
+
+Si una categoria no tiene publicaciones, no se renderiza su rail.
+
+En filtros especificos:
+
+- se muestra un unico rail de la categoria seleccionada;
+- si no hay publicaciones en esa categoria, se conserva el empty state existente.
+
+### Responsive
+
+- Desktop: se ven varias tarjetas por rail y las flechas permiten avanzar/retroceder.
+- Laptop: aproximadamente dos tarjetas visibles segun ancho.
+- Tablet: una tarjeta y media aproximadamente.
+- Mobile: una tarjeta casi completa con un peek de la siguiente y swipe horizontal.
+
+No hay autoplay y no se replica el carrusel del home. El rail es navegacion horizontal por catalogo, no un hero carousel.
+
+### Performance
+
+- No se agregaron dependencias.
+- No se usan librerias de animacion.
+- No se anima `width` ni `height`.
+- Las transiciones son ligeras y se limitan a `transform`, `opacity`, color, borde y sombra sutil.
+- El movimiento respeta `prefers-reduced-motion`.
+
+### Que no se toco
+
+No se modifico:
+
+- Supabase schema;
+- migraciones;
+- RLS;
+- auth;
+- middleware;
+- roles;
+- pagos;
+- Stripe;
+- carrusel del home;
+- admin/feed;
+- admin/events.
+
+No se ejecuto `supabase db reset`.
+
+### Como probar
+
+1. Crear 5 publicaciones tipo `event` en `/admin/feed`.
+2. Crear 3 publicaciones tipo `promotion`.
+3. Crear 2 publicaciones tipo `vip`.
+4. Abrir `/app/today`.
+5. Confirmar que `Destacados de la noche` aparece como rail horizontal.
+6. Confirmar que `Eventos`, `Promos` y `VIP` aparecen como rails separados.
+7. Probar flechas en desktop.
+8. Probar swipe horizontal en mobile.
+9. Confirmar que la pagina completa no genera scroll horizontal global.
+10. Confirmar que los CTA siguen respetando la regla por tipo.
+
+---
+
+## Fase actual: Spotlight de la noche en Hoy en FLEX
+
+### Objetivo
+
+Se rediseño la parte superior de `/app/today` para que no toda la pantalla funcione como rails horizontales. El mural ahora abre con un bloque editorial grande llamado `Spotlight de la noche` y mantiene los rails horizontales solo para exploracion inferior por categoria.
+
+### Nuevo componente
+
+Se creo `components/feed/TodaySpotlight.tsx`.
+
+El componente renderiza:
+
+- una card principal grande y visual;
+- una columna lateral `Agenda cercana` / `Proximos en FLEX`;
+- CTA coherente usando la logica existente de `getFeedPostCta(post)`;
+- imagen del post, del evento vinculado o fallback visual;
+- agenda de eventos publicados proximos.
+
+### Diferencia entre spotlight y rails
+
+`TodaySpotlight` es jerarquico y editorial: muestra una sola pieza principal para orientar la noche.
+
+`FeedRail` sigue siendo exploratorio: organiza listas horizontales por categorias como Promos, Eventos, Actividades, VIP, Escenario y Avisos.
+
+La estructura en filtro `Todos` queda:
+
+1. Header y filtros.
+2. `TodaySpotlight`.
+3. Rails por categoria.
+
+Ya no existe rail superior `Destacados de la noche`.
+
+### Como se elige el contenido principal
+
+Prioridad:
+
+1. Publicacion fijada con prioridad `high` o `urgent`.
+2. Publicacion fijada mas reciente.
+3. Evento publicado mas cercano en fecha futura o del dia.
+4. Primera publicacion activa.
+5. Si no hay posts ni eventos, se mantiene el empty state de pagina.
+
+Si el spotlight viene de una publicacion:
+
+- `event` con `event_id`: CTA `Ver evento` a `/app/events/[event_id]`;
+- `vip`: CTA `Reservar VIP` a `/app/vip`;
+- `stage`: CTA `Participar` a `/app/my-turn`;
+- `promotion`, `activity` o `announcement`: usan `cta_url` si existe; si no hay destino, no muestran CTA.
+
+Si el spotlight viene de un evento:
+
+- usa `/app/events/[id]`;
+- label `Ver evento`;
+- imagen `image_url`, luego `cover_image_path`, luego fallback local.
+
+### Proximos eventos cercanos
+
+`/app/today` consulta eventos publicados desde la tabla `events`:
+
+- `is_published = true`;
+- `starts_at >= inicio del dia actual`;
+- orden `starts_at asc`;
+- maximo 6 en la consulta y hasta 4 visibles en la columna.
+
+La columna lateral muestra:
+
+- dia/mes o `Hoy`;
+- hora;
+- titulo;
+- zona si existe;
+- estado `Proximo`, `Hoy` o `Destacado`;
+- CTA compacto `Ver` a `/app/events/[id]`.
+
+Si el evento del spotlight tambien aparece en la agenda, se oculta de la columna lateral para evitar repeticion visual.
+
+Si no hay proximos eventos, se muestra:
+
+```text
+La agenda se esta preparando.
+```
+
+### Responsive
+
+- Desktop: card principal a la izquierda y agenda a la derecha.
+- Laptop: proporcion aproximada 2/1.
+- Tablet/mobile: agenda baja debajo del spotlight y los items quedan compactos.
+
+No hay autoplay ni intervalos. Las transiciones son ligeras y se mantienen dentro de transform, color, borde y sombra sutil. Se respeta `prefers-reduced-motion` mediante las reglas globales existentes.
+
+### Que no se toco
+
+No se modifico:
+
+- Supabase schema;
+- migraciones;
+- RLS;
+- auth;
+- middleware;
+- roles;
+- pagos;
+- Stripe;
+- carrusel del home;
+- admin/feed;
+- admin/events.
+
+No se ejecuto `supabase db reset`.
+
+### Como probar
+
+1. Crear una publicacion fijada y prioridad alta en `/admin/feed`.
+2. Crear o publicar eventos proximos en `/admin/events`.
+3. Abrir `/app/today` en filtro `Todos`.
+4. Confirmar que la publicacion fijada alta ocupa el spotlight.
+5. Confirmar que la columna `Proximos en FLEX` lista hasta 4 eventos cercanos.
+6. Confirmar que el evento del spotlight no se duplica en la agenda lateral.
+7. Probar filtros `Promos`, `Eventos` y `VIP`; deben ocultar el spotlight y mostrar el rail filtrado.
+8. Probar responsive en desktop, laptop y mobile.
+9. Confirmar que los CTA siguen respetando la regla por tipo.
+
+---
+
+## Fase actual: Spotlight mixto y agenda rapida en Hoy en FLEX
+
+### Objetivo
+
+Se pulio el bloque superior de `/app/today` manteniendo la card protagonista del spotlight, pero reduciendo el lateral para que funcione como widget util y no como otra seccion pesada de eventos.
+
+La pagina queda:
+
+- arriba: `Spotlight de la noche` grande;
+- derecha: panel compacto `Esta noche`;
+- abajo: rails por categoria.
+
+No se agrego una nueva seccion de proximos eventos debajo para evitar saturar la zona inferior.
+
+### Panel `Esta noche`
+
+El lateral de `TodaySpotlight` ahora se presenta como `Agenda rapida` / `Esta noche`.
+
+Muestra maximo 3 items:
+
+- fecha o `Hoy`;
+- hora;
+- titulo;
+- zona si existe;
+- estado `Proximo`, `Hoy` o `Destacado`;
+- CTA pequeno `Ver`.
+
+El panel usa:
+
+- fondo oscuro/transparente;
+- borde sutil;
+- padding reducido;
+- separadores suaves;
+- items tipo lista premium.
+
+Si no hay proximos eventos, intenta mostrar hasta 3 acciones destacadas de tipo:
+
+- `promotion`;
+- `vip`;
+- `stage`.
+
+Si tampoco hay acciones con CTA, muestra:
+
+```text
+La agenda se esta preparando.
+```
+
+### Cards de evento
+
+Las cards de `type = event` en `FeedPostCard` cambian de comportamiento:
+
+- la card completa es clickeable cuando existe `event_id` valido;
+- el destino es `/app/events/[event_id]`;
+- no se muestra body largo dentro de la card;
+- se muestra contexto corto, titulo y affordance discreto `Ver evento`;
+- no se anidan botones ni links dentro del link principal.
+
+Esto evita que descripciones largas tapen la imagen, el artista/contexto visual o el acceso al evento.
+
+### Otros tipos de cards
+
+Las publicaciones que no son evento mantienen body corto y CTA por tipo:
+
+- `vip`: `Reservar VIP` hacia `/app/vip`;
+- `stage`: `Participar` hacia `/app/my-turn`;
+- `promotion`: `Ver promo` solo si hay `cta_url`;
+- `activity`: `Ver actividad` solo si hay `cta_url`;
+- `announcement`: `Mas informacion` solo si hay `cta_url`.
+
+Se mantiene la regla: nunca se usa `event_id` si `type` no es `event`.
+
+### Responsive
+
+- Desktop/laptop: spotlight izquierda y panel `Esta noche` derecha.
+- Tablet/mobile: el panel baja debajo del spotlight, manteniendose compacto.
+- No se convierte el panel en rail ni se duplica como seccion inferior.
+
+### Que no se toco
+
+No se modifico:
+
+- Supabase schema;
+- migraciones;
+- RLS;
+- auth;
+- middleware;
+- roles;
+- pagos;
+- Stripe;
+- carrusel del home;
+- admin/feed;
+- admin/events.
+
+No se ejecuto `supabase db reset`.
+
+### Como probar
+
+1. Crear una publicacion fijada alta en `/admin/feed`.
+2. Crear eventos proximos publicados.
+3. Abrir `/app/today` en `Todos`.
+4. Confirmar que la card principal grande se mantiene.
+5. Confirmar que el lateral dice `Esta noche` y muestra maximo 3 items compactos.
+6. Confirmar que no aparece una seccion extra de proximos eventos abajo.
+7. Abrir el rail `Eventos` y confirmar que las cards event completas son clickeables.
+8. Confirmar que las cards event no muestran body largo.
+9. Probar filtros `Promos`, `Eventos` y `VIP`.
+10. Probar responsive desktop, laptop y mobile.
