@@ -170,14 +170,14 @@ export default function TodayPage() {
         const [postResult, eventResult] = await Promise.all([
           supabase
             .from("daily_feed_posts")
-            .select("id, event_id, zone_id, title, body, type, priority, starts_at, ends_at, image_url, cta_label, cta_url, is_published, is_pinned, created_at, club_zones(name), events(title, image_url, cover_image_path)")
+            .select("id, event_id, zone_id, title, body, type, priority, starts_at, ends_at, image_url, cta_label, cta_url, is_published, is_pinned, created_at, club_zones(name), events(title, image_url, cover_image_path, artist_name, zone_name, starts_at)")
             .eq("is_published", true)
             .order("is_pinned", { ascending: false })
             .order("starts_at", { ascending: true, nullsFirst: false })
             .order("created_at", { ascending: false }),
           supabase
             .from("events")
-            .select("id, title, starts_at, ends_at, image_url, cover_image_path, zone_name, featured")
+            .select("id, title, starts_at, ends_at, image_url, cover_image_path, artist_name, zone_name, featured")
             .eq("is_published", true)
             .gte("starts_at", todayStart.toISOString())
             .order("starts_at", { ascending: true })

@@ -47,9 +47,9 @@ function ctaHelpForType(type: string) {
   if (type === "event") return "Destino por defecto: Ver evento -> /app/events/[event_id]. Los anuncios de evento deben vincularse a un evento creado en /admin/events.";
   if (type === "vip") return "Destino por defecto: Reservar VIP -> /app/vip. Puedes asociar una sala VIP como contexto visual.";
   if (type === "stage") return "Destino por defecto: Participar -> /app/my-turn.";
-  if (type === "promotion") return "Destino opcional: Ver promo usa la URL manual si existe. Si no hay URL, no se muestra boton.";
-  if (type === "activity") return "Destino opcional: Ver actividad usa la URL manual si existe. Si no hay URL, no se muestra boton.";
-  return "Destino opcional: Mas informacion usa la URL manual si existe. Si no hay URL, no se muestra boton.";
+  if (type === "promotion") return "Destino opcional: Ver promo usa la URL manual si existe. Si no hay URL, no se muestra botón.";
+  if (type === "activity") return "Destino opcional: Ver actividad usa la URL manual si existe. Si no hay URL, no se muestra botón.";
+  return "Destino opcional: Más información usa la URL manual si existe. Si no hay URL, no se muestra botón.";
 }
 
 function previewImageUrl(value: string) {
@@ -75,7 +75,7 @@ export function FeedPostForm({
   form: FeedPostFormState;
   setForm: (form: FeedPostFormState) => void;
   zones: Array<{ id: string; name: string }>;
-  events: Array<{ id: string; title: string }>;
+  events: Array<{ id: string; title: string; image_url?: string | null; cover_image_path?: string | null }>;
   imagePreviewUrl: string;
   imageInputKey: number;
   onImageFileChange: (file: File | null) => void;
@@ -85,7 +85,9 @@ export function FeedPostForm({
 }) {
   const datesAreEmpty = !form.starts_at && !form.ends_at;
   const manualImagePreviewUrl = previewImageUrl(form.image_url);
-  const activeImagePreviewUrl = imagePreviewUrl || manualImagePreviewUrl;
+  const selectedEvent = events.find((event) => event.id === form.event_id);
+  const eventImagePreviewUrl = selectedEvent?.image_url || selectedEvent?.cover_image_path || "";
+  const activeImagePreviewUrl = imagePreviewUrl || manualImagePreviewUrl || eventImagePreviewUrl;
   const isEventPost = form.type === "event";
 
   return (
@@ -177,6 +179,11 @@ export function FeedPostForm({
               <span className="block text-xs leading-5 text-[var(--muted)]">
                 Si subes un archivo, ese archivo tiene prioridad. La URL manual queda como respaldo.
               </span>
+              {form.event_id ? (
+                <span className="block text-xs leading-5 text-[var(--gold-bright)]">
+                  Si esta publicación está vinculada a un evento y no subes imagen, se usará la imagen del evento.
+                </span>
+              ) : null}
             </div>
           </label>
           <div className="flex flex-col gap-2">

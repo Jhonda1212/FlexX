@@ -11,6 +11,7 @@ export type TodayEventPreview = {
   ends_at: string | null;
   image_url: string | null;
   cover_image_path: string | null;
+  artist_name: string | null;
   zone_name: string | null;
   featured: boolean | null;
 };
@@ -67,7 +68,7 @@ function hourLabel(value: string) {
 }
 
 function bodyPreview(body: string | null) {
-  const fallback = "Seleccion oficial del equipo FLEX para orientar la noche.";
+  const fallback = "Selección oficial del equipo FLEX para orientar la noche.";
   const value = body?.trim() || fallback;
   return value.length > 168 ? `${value.slice(0, 165)}...` : value;
 }
@@ -75,7 +76,7 @@ function bodyPreview(body: string | null) {
 function selectionMeta(selection: SpotlightSelection) {
   if (selection.kind === "event") {
     return {
-      label: "Evento proximo",
+      label: "Evento próximo",
       title: selection.event.title,
       body: selection.event.zone_name ? `${selection.event.zone_name} · ${dayLabel(selection.event.starts_at)} ${hourLabel(selection.event.starts_at)}` : `${dayLabel(selection.event.starts_at)} ${hourLabel(selection.event.starts_at)}`,
       imageUrl: selection.event.image_url || selection.event.cover_image_path || "/images/events/john-coltrane.jpg",
@@ -108,7 +109,7 @@ function eventStatus(event: TodayEventPreview) {
   const sameDay = date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate();
   if (event.featured) return "Destacado";
   if (sameDay) return "Hoy";
-  return "Proximo";
+  return "Próximo";
 }
 
 function quickFallbackPosts(posts: FeedPostView[]) {
@@ -174,7 +175,7 @@ export function TodaySpotlight({ posts, events }: { posts: FeedPostView[]; event
       <aside className="self-start rounded-lg border border-white/10 bg-white/[0.026] p-3 sm:p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--gold)]">Agenda rapida</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--gold)]">Agenda rápida</p>
             <h3 className="mt-1 text-lg font-bold text-white">Esta noche</h3>
           </div>
           <CalendarClock size={18} className="text-[var(--gold)]" />
@@ -231,8 +232,8 @@ export function TodaySpotlight({ posts, events }: { posts: FeedPostView[]; event
           </div>
         ) : (
           <div className="mt-3 rounded-md border border-white/10 bg-black/24 p-3">
-            <p className="font-bold text-white">La agenda se esta preparando.</p>
-            <p className="mt-1.5 text-sm leading-6 text-white/56">Cuando haya eventos o acciones destacadas, apareceran aqui.</p>
+            <p className="font-bold text-white">La agenda se está preparando.</p>
+            <p className="mt-1.5 text-sm leading-6 text-white/56">Cuando haya eventos o acciones destacadas, aparecerán aquí.</p>
           </div>
         )}
       </aside>

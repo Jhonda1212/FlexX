@@ -16,15 +16,34 @@
 -- from public.daily_feed_posts
 -- order by created_at desc;
 
-select
-  schemaname,
-  tablename,
-  policyname,
-  permissive,
-  roles,
-  cmd,
-  qual,
-  with_check
-from pg_policies
-where schemaname = 'public'
-  and tablename = 'daily_feed_posts';
+-- select
+--   schemaname,
+--   tablename,
+--   policyname,
+--   permissive,
+--   roles,
+--   cmd,
+--   qual,
+--   with_check
+-- from pg_policies
+-- where schemaname = 'public'
+--   and tablename = 'daily_feed_posts';
+
+-- insert into public.staff_profiles (
+--   user_id,
+--   role,
+--   display_name,
+--   active
+-- )
+-- select
+--   u.id,
+--   'admin',
+--   'Administrador FLEX',
+--   true
+-- from auth.users u
+-- where lower(u.email) = lower('jhonda@gmail.com')
+-- on conflict (user_id) do update
+-- set
+--   role = 'admin',
+--   display_name = 'Administrador FLEX',
+--   active = true;

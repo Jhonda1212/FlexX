@@ -344,7 +344,7 @@ with seed_feed_posts (
   image_url
 ) as (
   values
-    ('44444444-4444-4444-8444-444444444401'::uuid, 'Live Jazz Session', 'La banda principal inicia esta noche en el escenario de FLEX.', 'event'::public.feed_post_type, 'high'::public.feed_priority, true, true, null::text),
+    ('44444444-4444-4444-8444-444444444401'::uuid, 'Live Jazz Session', 'La banda principal inicia esta noche en el escenario de FLEX.', 'stage'::public.feed_post_type, 'high'::public.feed_priority, true, true, null::text),
     ('44444444-4444-4444-8444-444444444402'::uuid, U&'2x1 en c\00F3cteles', 'Promocion disponible en el Bar Principal por tiempo limitado.', 'promotion'::public.feed_post_type, 'normal'::public.feed_priority, true, false, null::text),
     ('44444444-4444-4444-8444-444444444403'::uuid, 'Open Mic', 'Inscribete para cantar o tocar en la live session.', 'stage'::public.feed_post_type, 'normal'::public.feed_priority, true, false, null::text),
     ('44444444-4444-4444-8444-444444444404'::uuid, U&'\00DAltimos cupos VIP', 'Consulta disponibilidad en Sala Negra, Sala Roja y Sala Dorada.', 'vip'::public.feed_post_type, 'high'::public.feed_priority, true, false, null::text)

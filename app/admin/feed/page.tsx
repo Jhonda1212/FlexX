@@ -13,6 +13,7 @@ import {
 import { Card, SectionTitle } from "@/components/ui/Card";
 import { FlexCard } from "@/components/ui/FlexCard";
 import { FeedPriorityBadge, FeedTypeBadge, feedPriorities, feedTypes } from "@/components/feed/FeedBadges";
+import { getFeedPostImageUrl } from "@/components/feed/FeedPostCard";
 import { FeedPostForm, emptyFeedPostForm, type FeedPostFormState } from "@/components/feed/FeedPostForm";
 import { fromDateTimeLocal, isoInputValue, requireAdmin } from "@/lib/admin-actions";
 
@@ -33,7 +34,14 @@ type FeedAdminRow = {
   is_pinned: boolean;
   created_at: string;
   club_zones?: { name?: string | null } | null;
-  events?: { title?: string | null; image_url?: string | null; cover_image_path?: string | null } | null;
+  events?: {
+    title?: string | null;
+    image_url?: string | null;
+    cover_image_path?: string | null;
+    artist_name?: string | null;
+    zone_name?: string | null;
+    starts_at?: string | null;
+  } | null;
 };
 
 const seedEventTitles = new Set([
@@ -77,6 +85,20 @@ function isValidManualImageReference(value: string) {
 
   const normalized = trimmed.replace(/^public\//i, "");
   return normalized.length > 0 && !/\s/.test(normalized);
+}
+
+function isValidCtaUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return true;
+  if (trimmed.startsWith("/")) return !trimmed.startsWith("//");
+  if (!/^https:\/\//i.test(trimmed)) return false;
+
+  try {
+    new URL(trimmed);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function toForm(post: FeedAdminRow): FeedPostFormState {
@@ -159,7 +181,7 @@ function validateForm(form: FeedPostFormState) {
   if (form.type === "event" && !form.event_id) {
     return "Los anuncios de evento deben vincularse a un evento creado en /admin/events.";
   }
-  if (form.cta_url && !form.cta_url.startsWith("/") && !form.cta_url.startsWith("https://")) {
+  if (!isValidCtaUrl(form.cta_url)) {
     return "La URL del CTA debe empezar con / o con https://.";
   }
   const dateWindowError = getDateWindowError(form.starts_at, form.ends_at);
@@ -170,7 +192,7 @@ function validateForm(form: FeedPostFormState) {
 export default function AdminFeedPage() {
   const [posts, setPosts] = useState<FeedAdminRow[]>([]);
   const [zones, setZones] = useState<Array<{ id: string; name: string }>>([]);
-  const [events, setEvents] = useState<Array<{ id: string; title: string }>>([]);
+  const [events, setEvents] = useState<Array<{ id: string; title: string; image_url?: string | null; cover_image_path?: string | null }>>([]);
   const [form, setForm] = useState<FeedPostFormState>(emptyFeedPostForm);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageInputKey, setImageInputKey] = useState(0);
@@ -187,18 +209,18 @@ export default function AdminFeedPage() {
     const [postResult, zoneResult, eventResult] = await Promise.all([
       supabase
         .from("daily_feed_posts")
-        .select("id, event_id, zone_id, title, body, type, priority, starts_at, ends_at, image_url, cta_label, cta_url, is_published, is_pinned, created_at, club_zones(name), events(title, image_url, cover_image_path)")
+        .select("id, event_id, zone_id, title, body, type, priority, starts_at, ends_at, image_url, cta_label, cta_url, is_published, is_pinned, created_at, club_zones(name), events(title, image_url, cover_image_path, artist_name, zone_name, starts_at)")
         .order("is_pinned", { ascending: false })
         .order("created_at", { ascending: false }),
       supabase.from("club_zones").select("id, name").order("name", { ascending: true }),
-      supabase.from("events").select("id, title").order("starts_at", { ascending: false })
+      supabase.from("events").select("id, title, image_url, cover_image_path").order("starts_at", { ascending: false })
     ]);
     if (postResult.error) throw postResult.error;
     if (zoneResult.error) throw zoneResult.error;
     if (eventResult.error) throw eventResult.error;
     setPosts((postResult.data ?? []) as FeedAdminRow[]);
     setZones((zoneResult.data ?? []) as Array<{ id: string; name: string }>);
-    setEvents(((eventResult.data ?? []) as Array<{ id: string; title: string }>).filter((event) => !seedEventTitles.has(event.title)));
+    setEvents(((eventResult.data ?? []) as Array<{ id: string; title: string; image_url?: string | null; cover_image_path?: string | null }>).filter((event) => !seedEventTitles.has(event.title)));
   }
 
   useEffect(() => {
@@ -349,6 +371,7 @@ export default function AdminFeedPage() {
   }
 
   async function deletePost(id: string) {
+    if (!window.confirm("¿Eliminar esta publicación? Esta acción no se puede deshacer.")) return;
     setError("");
     setMessage("");
     try {
@@ -403,7 +426,7 @@ export default function AdminFeedPage() {
                 <div className="flex items-start gap-3">
                   <div
                     className="h-14 w-16 shrink-0 rounded-md border border-white/10 bg-gradient-to-br from-[var(--gold)]/14 via-red-950/18 to-black bg-cover bg-center"
-                    style={post.image_url ? { backgroundImage: `linear-gradient(180deg,rgba(0,0,0,0.02),rgba(0,0,0,0.36)), url(${post.image_url})` } : undefined}
+                    style={getFeedPostImageUrl(post) ? { backgroundImage: `linear-gradient(180deg,rgba(0,0,0,0.02),rgba(0,0,0,0.36)), url(${getFeedPostImageUrl(post)})` } : undefined}
                     aria-hidden="true"
                   />
                   <div className="min-w-0">
@@ -424,7 +447,7 @@ export default function AdminFeedPage() {
               <td className="px-4 py-3 text-xs text-[var(--muted)]">{contextLabelForPost(post)}</td>
               <td className="px-4 py-3">{new Date(post.created_at).toLocaleString("es-ES")}</td>
               <td className="px-4 py-3">
-                <div className="flex flex-wrap gap-2">
+                <div className="grid min-w-[9rem] grid-cols-1 gap-2 sm:min-w-[13rem] sm:grid-cols-2 [&_button]:min-h-9 [&_button]:w-full [&_button]:px-3 [&_button]:text-[11px] [&_button]:tracking-[0.06em]">
                   <AdminActionButton variant="ghost" onClick={() => { setEditingId(post.id); setForm(toForm(post)); setShowForm(true); }}>Editar</AdminActionButton>
                   <AdminActionButton variant={post.is_published ? "danger" : "success"} onClick={() => patchPost(post.id, { is_published: !post.is_published })}>{post.is_published ? "Despublicar" : "Publicar"}</AdminActionButton>
                   <AdminActionButton variant="ghost" onClick={() => patchPost(post.id, { is_pinned: !post.is_pinned })}>{post.is_pinned ? "Desfijar" : "Fijar"}</AdminActionButton>

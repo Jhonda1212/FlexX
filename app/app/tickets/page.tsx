@@ -19,6 +19,14 @@ export default function TicketsPage() {
 
   useEffect(() => {
     let active = true;
+    const checkout = new URLSearchParams(window.location.search).get("checkout");
+    if (checkout === "success") {
+      setMessage("Pago recibido por Stripe. Estamos esperando la confirmacion segura del webhook para activar tu entrada.");
+    }
+    if (checkout === "cancelled") {
+      setMessage("Checkout cancelado. No se ha confirmado ningun pago.");
+    }
+
     listUserTickets()
       .then((data) => {
         if (!active) return;
@@ -49,6 +57,7 @@ export default function TicketsPage() {
 
       {loading ? <Card><p className="text-[var(--muted)]">Cargando entradas...</p></Card> : null}
       {error ? <Card><div className="rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</div></Card> : null}
+      {message ? <Card><div className="rounded-md border border-[var(--gold)]/30 bg-[var(--gold)]/10 p-3 text-sm text-[var(--gold-bright)]">{message}</div></Card> : null}
       {!loading && !error && tickets.length === 0 ? (
         <AppEmptyState
           icon={<Ticket size={24} />}
@@ -68,7 +77,6 @@ export default function TicketsPage() {
             <StatusPill tone={tone}>{selected.status}</StatusPill>
             <h2 className="font-display mt-4 text-5xl text-white">{selected.eventName}</h2>
             <p className="mt-2 text-[var(--muted)]">Token: {selected.qrToken}</p>
-            {message ? <div className="mt-4 rounded-md border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-200">{message}</div> : null}
             <Button className="mt-6 w-full sm:w-auto" disabled={selected.status !== "valid"} onClick={() => setMessage("QR listo para mostrar en puerta.")}>Mostrar en puerta</Button>
           </div>
         </div> : null}

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { ArrowRight, Crown, Users } from "lucide-react";
 import { AppEmptyState } from "@/components/app/AppEmptyState";
 import { AppPageHeader } from "@/components/app/AppPageHeader";
@@ -83,7 +82,15 @@ function formatPrice(cents: number) {
   }).format(cents / 100);
 }
 
-function RoomCard({ room }: { room: VipRoom }) {
+function RoomCard({
+  room,
+  loading,
+  onReserve
+}: {
+  room: VipRoom;
+  loading: boolean;
+  onReserve: (room: VipRoom) => void;
+}) {
   const theme = roomTheme(room);
 
   return (
@@ -126,11 +133,11 @@ function RoomCard({ room }: { room: VipRoom }) {
           </div>
         </div>
 
-        <Link href={`/app/vip/${room.id}/share`} prefetch={false} className="gold-focus mt-auto rounded-full pt-4">
-          <FlexButton className={`w-full ${theme.button}`}>
+        <div className="mt-auto pt-4">
+          <FlexButton className={`w-full ${theme.button}`} loading={loading} onClick={() => onReserve(room)}>
             {theme.cta} <ArrowRight className="transition-transform duration-300 ease-out group-hover:translate-x-0.5" size={18} />
           </FlexButton>
-        </Link>
+        </div>
       </div>
     </FlexCard>
   );
@@ -140,6 +147,8 @@ export default function VipPage() {
   const [rooms, setRooms] = useState<VipRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [checkoutRoomId, setCheckoutRoomId] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -157,6 +166,31 @@ export default function VipPage() {
       active = false;
     };
   }, []);
+
+  async function startVipCheckout(room: VipRoom) {
+    setCheckoutError("");
+    setCheckoutRoomId(room.id);
+
+    try {
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          item_type: "vip",
+          zone_id: room.id,
+          quantity: 1
+        })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.url) {
+        throw new Error(data.error || "No se pudo iniciar el pago.");
+      }
+      window.location.href = data.url as string;
+    } catch (checkoutError) {
+      setCheckoutError(checkoutError instanceof Error ? checkoutError.message : "No se pudo iniciar el pago.");
+      setCheckoutRoomId(null);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -186,6 +220,11 @@ export default function VipPage() {
           <p className="text-red-100">{error}</p>
         </FlexCard>
       ) : null}
+      {checkoutError ? (
+        <FlexCard tone="danger">
+          <p className="text-red-100">{checkoutError}</p>
+        </FlexCard>
+      ) : null}
 
       {!loading && !error && rooms.length === 0 ? (
         <AppEmptyState
@@ -199,7 +238,7 @@ export default function VipPage() {
       {!loading && !error && rooms.length > 0 ? (
         <div className="grid items-stretch gap-4 md:grid-cols-2 2xl:grid-cols-3">
           {rooms.map((room) => (
-            <RoomCard key={room.id} room={room} />
+            <RoomCard key={room.id} room={room} loading={checkoutRoomId === room.id} onReserve={startVipCheckout} />
           ))}
         </div>
       ) : null}

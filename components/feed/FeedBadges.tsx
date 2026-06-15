@@ -13,15 +13,13 @@ const typeLabels: Record<FeedPostType, string> = {
   stage: "Escenario"
 };
 
-const typeIcons: Record<string, string> = {
-  event: "🎷",
-  promotion: "🍸",
-  activity: "🎤",
-  announcement: "📢",
-  vip: "👑",
-  stage: "🎙",
-  security: "🚨",
-  storage: "🧥"
+const typeMarkers: Record<FeedPostType, string> = {
+  event: "EV",
+  promotion: "PR",
+  activity: "AC",
+  announcement: "AV",
+  vip: "VIP",
+  stage: "ST"
 };
 
 const priorityLabels: Record<FeedPriority, string> = {
@@ -39,14 +37,15 @@ const priorityClass: Record<FeedPriority, string> = {
 };
 
 export function getFeedTypeIcon(type: string) {
-  return typeIcons[(feedTypes as readonly string[]).includes(type) ? type as FeedPostType : "announcement"];
+  const safeType = (feedTypes as readonly string[]).includes(type) ? type as FeedPostType : "announcement";
+  return typeMarkers[safeType];
 }
 
 export function FeedTypeBadge({ type }: { type: string }) {
   const safeType = (feedTypes as readonly string[]).includes(type) ? type as FeedPostType : "announcement";
   return (
     <span className="inline-flex items-center gap-2 rounded-full border border-[var(--gold)]/25 bg-[var(--gold)]/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] text-[var(--gold-bright)]">
-      <span>{typeIcons[safeType]}</span>
+      <span className="text-[10px]">{typeMarkers[safeType]}</span>
       {typeLabels[safeType]}
     </span>
   );

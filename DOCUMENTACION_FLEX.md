@@ -7196,3 +7196,452 @@ No se ejecuto `supabase db reset`.
 8. Confirmar que las cards event no muestran body largo.
 9. Probar filtros `Promos`, `Eventos` y `VIP`.
 10. Probar responsive desktop, laptop y mobile.
+## Fase actual: reparación técnica de admin/feed - 2026-06-15
+
+### Contexto
+
+Se revisó primero la parte técnica de `/admin/feed` y la navegación del área admin antes de continuar con cualquier cambio visual en `/app/today`.
+
+El archivo de ruta `app/admin/feed/page.tsx` existe y no contiene `notFound()` ni redirects propios. El 404 observado en `/admin/feed` apunta a estado generado/dev server desincronizado, especialmente porque `npm run lint` ya fallaba leyendo `.next/dev/types` corruptos. La validación final debe hacerse con `.next` limpio si vuelve a aparecer.
+
+### Cambios realizados
+
+- `components/layout/AppShell.tsx`
+  - Se agregó timeout de 8 segundos a la validación de rol staff.
+  - Si Supabase Auth o `staff_profiles` no responde, la pantalla deja de quedarse indefinidamente en `Validando navegación...` y muestra un mensaje claro.
+  - No se cambió middleware ni la lógica de auth server-side.
+
+- `app/admin/feed/page.tsx`
+  - Se mantiene la ruta `/admin/feed`.
+  - Se agregó confirmación antes de eliminar:
+    `¿Eliminar esta publicación? Esta acción no se puede deshacer.`
+  - Se endureció la validación de CTA: solo acepta rutas internas que empiezan por `/` y no por `//`, o URLs `https://` válidas.
+
+- `components/feed/FeedPostCard.tsx`
+  - `getFeedPostCta` ahora ignora `cta_url` inseguras o inválidas.
+  - Se rechazan valores como `javascript:`, `data:`, `http://` externo y URLs protocol-relative `//...`.
+  - La prioridad queda:
+    1. `cta_url` válido.
+    2. `event_id` si `type === "event"`.
+    3. destino default por tipo (`vip`, `stage`).
+    4. sin botón si no hay destino seguro.
+
+- `components/feed/FeedPostForm.tsx`, `components/feed/FeedBadges.tsx`, `components/feed/TodaySpotlight.tsx`
+  - Se corrigieron textos con mojibake.
+  - Se reemplazaron emojis corruptos del badge admin por marcadores de texto limpios (`EV`, `PR`, `AC`, `AV`, `VIP`, `ST`).
+
+- `supabase/seed.sql`
+  - El seed `Live Jazz Session` dejó de ser `type='event'` sin `event_id`.
+  - Ahora queda como `type='stage'`, evitando enlaces de evento huérfanos.
+
+- `supabase/migrations/20260615100000_harden_daily_feed_posts_admin_rls.sql`
+  - Nueva migración incremental.
+  - No modifica migraciones antiguas.
+  - Reemplaza policies de escritura `staff insert/update/delete daily feed` por policies admin-only:
+    - `admin insert daily feed`
+    - `admin update daily feed`
+    - `admin delete daily feed`
+  - Mantiene lectura de publicaciones publicadas para usuarios autenticados.
+  - Mantiene lectura completa del feed para staff activo.
+  - Corrige filas publicadas `type='event'` sin `event_id` para que no queden huérfanas tras un reset.
+
+### Verificación local de base de datos
+
+Se ejecutó:
+
+```bash
+supabase migration up
+```
+
+Resultado:
+
+- La migración nueva se aplicó sin reset.
+- `daily_feed_posts` mantiene 5 policies:
+  - lectura publicada para usuarios autenticados;
+  - lectura completa para staff;
+  - insert/update/delete solo con `public.is_admin()`.
+- `Live Jazz Session` quedó como `stage`.
+- Hay `0` publicaciones publicadas tipo `event` sin `event_id`.
+
+### Usuario admin local
+
+No se crearon usuarios Auth.
+
+Para verificar un admin local después de un reset:
+
+```sql
+select id, email from auth.users order by created_at desc;
+
+select p.id, p.full_name, sp.role, sp.active
+from public.profiles p
+left join public.staff_profiles sp on sp.user_id = p.id
+order by p.created_at desc;
+```
+
+Si falta `staff_profiles` activo con `role='admin'`, la app debe mostrar un estado claro de rol no disponible o redirigir a `/unauthorized`; no debe quedarse indefinidamente en `Validando navegación...`.
+
+### Qué no se tocó
+
+- No se rediseñó `/app/today`.
+- No se quitaron rails/carruseles.
+- No se tocó el carrusel del home.
+- No se tocó pagos ni Stripe.
+- No se modificaron migraciones antiguas.
+- No se ejecutó `supabase db reset`.
+- No se cambió middleware salvo diagnóstico.
+
+### Cómo probar
+
+1. Iniciar sesión con un usuario que tenga `staff_profiles.role = 'admin'` y `active = true`.
+2. Abrir `/admin`.
+3. Abrir `/admin/events`.
+4. Abrir `/admin/feed`.
+5. Crear una publicación.
+6. Editar la publicación.
+7. Publicar/despublicar y fijar/desfijar.
+8. Intentar eliminar y confirmar que aparece el diálogo de confirmación.
+9. Crear un CTA con `/app/vip` o `https://...` y confirmar que se renderiza.
+10. Intentar CTA inseguro (`javascript:...`, `data:...`, `http://...`, `//...`) y confirmar que no se renderiza en `/app/today`.
+11. Abrir `/app/today` y confirmar que no hay error ni pantalla blanca.
+
+### Validación técnica
+
+Se ejecutó:
+
+```bash
+npm run lint
+npm run build
+npm run lint
+```
+
+Resultado:
+
+- `npm run lint`: correcto.
+- `npm run build`: correcto.
+- `npm run lint` final: correcto.
+- El build de Next detecta `/admin/feed`, `/admin/events`, `/admin/staff` y el resto de rutas admin.
+- Una request sin sesión a `/admin/feed` responde `307` hacia `/login?redirectTo=%2Fadmin%2Ffeed`, no `404`.
+
+## Fase actual: herencia de imagen evento/feed y acciones admin/feed - 2026-06-15
+
+### Contexto
+
+Después de reparar `/admin/feed`, RLS y CTA seguro, se hizo un pulido acotado para integrar mejor publicaciones del feed con eventos reales y ordenar la columna de acciones del administrador.
+
+No se rediseñó `/app/today`; se mantienen los rails/carruseles existentes.
+
+### Prioridad de imagen en Hoy en FLEX
+
+Las tarjetas del feed usan esta prioridad visual:
+
+1. `daily_feed_posts.image_url`
+2. `events.image_url` cuando la publicación tiene `event_id`
+3. `events.cover_image_path` como respaldo del evento
+4. fallback visual por tipo de publicación
+
+Esto permite crear una publicación tipo `event` vinculada a un evento real sin subir una imagen duplicada al feed. Si después se sube una imagen propia en `/admin/feed`, esa imagen tiene prioridad sobre la del evento. Si se quita la imagen propia, vuelve a usarse la imagen heredada del evento.
+
+### Cambios realizados
+
+- `components/feed/FeedPostCard.tsx`
+  - `getFeedPostImageUrl(post)` mantiene la prioridad `feed image -> event image -> event cover`.
+  - El tipo `FeedPostView.events` ahora contempla `artist_name`, `zone_name` y `starts_at` como campos opcionales.
+  - Las cards pueden mostrar `events.zone_name` si la publicación no tiene `club_zones.name`.
+
+- `components/feed/TodaySpotlight.tsx`
+  - `TodayEventPreview` contempla `artist_name`.
+  - Las publicaciones destacadas siguen usando `getFeedPostImageUrl`, por lo que heredan imagen del evento cuando aplica.
+
+- `app/app/today/page.tsx`
+  - La consulta de `daily_feed_posts` ahora trae del evento relacionado:
+    - `title`
+    - `image_url`
+    - `cover_image_path`
+    - `artist_name`
+    - `zone_name`
+    - `starts_at`
+  - La consulta de agenda de eventos también trae `artist_name`.
+
+- `app/admin/feed/page.tsx`
+  - La miniatura de la tabla usa la misma prioridad de imagen que las cards del feed.
+  - Si una publicación vinculada a evento no tiene imagen propia, se ve la imagen heredada del evento.
+  - La columna `Acciones` ahora usa una grilla estable:
+    - desktop/tablet: 2x2
+    - mobile: apilada en una columna
+  - Se mantienen las mismas acciones: editar, publicar/despublicar, fijar/desfijar y eliminar.
+
+- `components/feed/FeedPostForm.tsx`
+  - El formulario puede usar la imagen del evento seleccionado como preview cuando no hay imagen propia.
+  - Se agregó helper:
+    `Si esta publicación está vinculada a un evento y no subes imagen, se usará la imagen del evento.`
+
+### Qué no se tocó
+
+- No se ejecutó `supabase db reset`.
+- No se modificaron migraciones antiguas.
+- No se tocó auth.
+- No se tocó middleware.
+- No se tocaron roles.
+- No se tocó pagos ni Stripe.
+- No se tocó el carrusel del home.
+- No se rediseñó completamente `/app/today`.
+- No se quitaron rails/carruseles existentes.
+- No se agregaron dependencias.
+- No se cambió la RLS ya corregida.
+- No se relajó la validación CTA segura.
+
+### Cómo probar
+
+1. Crear o editar un evento en `/admin/events` con `image_url`.
+2. Crear en `/admin/feed` una publicación tipo `event` vinculada a ese evento sin subir imagen propia.
+3. Confirmar en `/admin/feed` que la miniatura hereda la imagen del evento.
+4. Abrir `/app/today` y confirmar que la card usa la imagen del evento.
+5. Editar la publicación y subir una imagen propia.
+6. Confirmar que `/admin/feed` y `/app/today` usan la imagen propia del feed.
+7. Quitar la imagen propia.
+8. Confirmar que vuelve a usarse la imagen del evento.
+9. Crear una publicación promo sin evento y sin imagen.
+10. Confirmar que usa fallback visual y no intenta heredar imagen de evento.
+11. Revisar la columna `Acciones` en desktop y mobile: botones alineados, sin `Eliminar` suelto en una línea rara.
+
+### Validación técnica
+
+Se ejecutó:
+
+```bash
+npm run lint
+npm run build
+```
+
+Resultado:
+
+- `npm run lint`: correcto.
+- `npm run build`: correcto.
+- El build sigue detectando `/admin/feed` y `/app/today`.
+
+## Fase actual: separación de Hoy en FLEX y eventos en home - 2026-06-15
+
+### Contexto
+
+En `/app`, el bloque `Hoy en FLEX` y el bloque `Próximos eventos` podían repetir contenido cuando el feed incluía publicaciones tipo `event`. Esto hacía que la pantalla se sintiera saturada y con dos secciones cumpliendo una función parecida.
+
+### Nueva regla de contenido
+
+- `/app` es un resumen rápido de la noche.
+- `/app/today` es el mural completo de Hoy en FLEX.
+- `/app/events` es la vista oficial de eventos reales.
+
+En el home, `Hoy en FLEX` prioriza publicaciones operativas o comerciales:
+
+- `promotion`
+- `vip`
+- `stage`
+- `activity`
+- `announcement`
+
+Por defecto no muestra publicaciones `type='event'` para evitar duplicarlas con `Próximos eventos`. Si no hay publicaciones activas no-event, puede mostrar como fallback máximo 1 publicación tipo `event`. El bloque sigue limitado a máximo 3 publicaciones.
+
+### Cambios realizados
+
+- `components/app/HomeTodayPreview.tsx`
+  - La consulta trae hasta 6 publicaciones activas para poder filtrar del lado cliente.
+  - Se seleccionan hasta 3 publicaciones no-event.
+  - Si no hay publicaciones no-event activas, se permite 1 evento como fallback.
+  - El CTA cambió de `Ver avisos` a `Ver mural` y mantiene destino `/app/today`.
+  - El copy del bloque aclara su función: `Promos, avisos y movimientos rápidos de la noche.`
+
+### Qué no se tocó
+
+- No se tocó Supabase schema.
+- No se crearon migraciones.
+- No se ejecutó `supabase db reset`.
+- No se tocó RLS.
+- No se tocó auth.
+- No se tocó middleware.
+- No se tocó pagos ni Stripe.
+- No se tocó `/app/today`.
+- No se tocó `/admin/feed`.
+- No se tocó `/admin/events`.
+- No se agregaron dependencias.
+
+### Cómo probar
+
+1. Crear varias publicaciones activas no-event en `/admin/feed`.
+2. Crear una publicación activa tipo `event`.
+3. Abrir `/app`.
+4. Confirmar que `Hoy en FLEX` muestra promos, avisos, VIP, escenario o actividades, no el evento duplicado.
+5. Confirmar que `Próximos eventos` sigue mostrando eventos reales.
+6. Si solo existe una publicación tipo `event` y no hay no-event activas, confirmar que `Hoy en FLEX` muestra máximo 1 fallback.
+7. Abrir `Ver mural` y confirmar que lleva a `/app/today`.
+
+## Fase actual: Stripe Checkout base - 2026-06-15
+
+### Contexto
+
+Se implemento la Fase 1 de pagos reales: configuracion servidor de Stripe, creacion de Checkout Session desde backend, ordenes `pending` en Supabase, webhook validado y generacion de accesos solo cuando Stripe confirma el pago.
+
+No se implementaron graficas, KPIs ni estadisticas avanzadas en `/admin/payments`; eso queda para una fase posterior.
+
+### Variables de entorno
+
+`.env.example` incluye:
+
+```bash
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+SUPABASE_SERVICE_ROLE_KEY=
+```
+
+Reglas:
+
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` y `SUPABASE_SERVICE_ROLE_KEY` son solo servidor.
+- Ninguna clave secreta debe llevar prefijo `NEXT_PUBLIC_`.
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` queda documentada para fases cliente posteriores.
+
+### Flujo Checkout
+
+Endpoint:
+
+- `POST /api/checkout`
+
+Body permitido:
+
+- `item_type`: `ticket` o `vip`
+- `event_id`: requerido para tickets
+- `ticket_tier_id`: requerido para tickets
+- `zone_id`: requerido para VIP
+- `quantity`: entre 1 y 10; VIP se limita a 1
+
+El backend valida usuario autenticado, producto real, disponibilidad basica y precios desde Supabase. Despues crea `orders.status = pending`, crea `order_items`, crea Stripe Checkout Session, guarda `stripe_checkout_session_id` y devuelve `session.url`.
+
+URLs:
+
+- success: `/app/tickets?checkout=success&session_id={CHECKOUT_SESSION_ID}`
+- cancel: `/app/tickets?checkout=cancelled`
+
+El frontend no crea tickets ni marca ordenes como pagadas.
+
+### Webhook Stripe
+
+Endpoint:
+
+- `POST /api/stripe/webhook`
+
+El webhook lee raw body, valida `Stripe-Signature` con `STRIPE_WEBHOOK_SECRET`, usa cliente servidor con `SUPABASE_SERVICE_ROLE_KEY`, responde 400 si la firma no es valida y responde 200 si el evento se procesa o se ignora de forma segura.
+
+Eventos manejados:
+
+- `checkout.session.completed`
+- `checkout.session.expired`
+- `payment_intent.payment_failed`
+- `charge.refunded`
+
+### Confirmacion de pago y accesos
+
+`checkout.session.completed` busca la orden por `stripe_checkout_session_id`, valida `amount_total` y `currency`, marca `status = paid`, guarda `paid_at`, `stripe_payment_intent_id`, `stripe_customer_id` y `customer_email`, y crea fulfillment segun `order_items`.
+
+Fulfillment:
+
+- `ticket`: crea filas en `tickets` con `order_id`, `user_id`, `event_id`, `zone_id` si aplica y `status = active`.
+- `vip`: crea filas en `private_room_access` con `order_id`, `user_id`, `zone_id`, `active = true` y `max_guests` segun capacidad de sala hasta 10.
+
+Idempotencia:
+
+- Antes de crear tickets o accesos, el webhook revisa si ya existe fulfillment para ese `order_id` en `tickets` o `private_room_access`.
+- Si Stripe reintenta el webhook despues de una orden ya pagada, responde sin duplicar.
+
+Estados adicionales:
+
+- `checkout.session.expired`: si la orden sigue `pending`, se marca `failed`.
+- `payment_intent.payment_failed`: marca `failed` cuando puede vincularse por `stripe_payment_intent_id`.
+- `charge.refunded`: marca `refunded` cuando puede vincularse por `stripe_payment_intent_id`.
+
+### Cambios en UI
+
+- `/app/events/[eventId]`: cada tier activo tiene boton `Comprar` que llama a `/api/checkout` y redirige a Stripe.
+- `/app/vip`: cada sala VIP activa inicia Checkout para reservar la sala; VIP se compra de una en una.
+- `/app/tickets`: lee `checkout=success` y `checkout=cancelled` y muestra aviso sin marcar nada como pagado.
+- `/admin/payments`: mantiene vista basica sin graficas, con filtros `pending`, `paid`, `failed` y `refunded`.
+
+### Migracion nueva
+
+`supabase/migrations/20260615110000_add_stripe_checkout_to_orders.sql` agrega:
+
+- `orders.stripe_customer_id`
+- `orders.customer_email`
+- `orders.paid_at`
+- `order_items.ticket_tier_id`
+- `order_items.total_amount_cents`
+- `tickets.zone_id`
+- indices para session, status, created_at, order items y fulfillment por order.
+
+No se modificaron migraciones antiguas.
+
+### Como probar local con Stripe CLI
+
+1. Ejecutar `stripe login`.
+2. Ejecutar `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
+3. Copiar el `whsec_...` generado a `.env.local` como `STRIPE_WEBHOOK_SECRET`.
+4. Configurar `STRIPE_SECRET_KEY`, `SUPABASE_SERVICE_ROLE_KEY` y `NEXT_PUBLIC_APP_URL=http://localhost:3000`.
+5. Ejecutar `npm run dev`.
+6. Crear o verificar un evento publicado con tier activo, o una sala VIP activa con precio.
+7. Comprar usando tarjeta test `4242 4242 4242 4242`, fecha futura y CVC cualquiera.
+8. Confirmar que la orden inicia `pending`, el webhook la cambia a `paid`, se crea ticket o acceso VIP, `/app/tickets` muestra la entrada y `/admin/payments` muestra la orden pagada.
+
+### Que queda pendiente para fase 2
+
+- Graficas en `/admin/payments`.
+- KPIs.
+- Top eventos.
+- Ingresos por dia.
+- Reembolsos manuales desde admin.
+- Mejor pantalla de detalle de orden.
+
+### Que no se toco
+
+- No se ejecuto `supabase db reset`.
+- No se modificaron migraciones antiguas.
+- No se borraron migraciones.
+- No se toco `/app/today`.
+- No se toco feed.
+- No se toco carrusel del home.
+- No se tocaron pagos visuales avanzados ni graficas.
+- No se expusieron secretos en cliente.
+
+## Fase actual: diagnostico temporal de Checkout local - 2026-06-15
+
+### Contexto
+
+Se agrego diagnostico acotado a desarrollo para investigar por que `POST /api/checkout` devuelve 500 en local al reservar una sala VIP desde `/app/vip`.
+
+### Cambios realizados
+
+- `app/api/checkout/route.ts`
+  - Se agregaron logs temporales solo cuando `NODE_ENV !== "production"`.
+  - Los logs no imprimen claves completas; solo indican si existen variables sensibles.
+  - Se registra el payload normalizado recibido.
+  - Se registra el resultado de auth con prefijo parcial del usuario y si hay email, sin imprimir el email.
+  - Se registra el lookup de `club_zones` para VIP, incluyendo si encontro zona, tipo, estado, precio y capacidad.
+  - Se registra el lookup de `events` y `event_ticket_tiers` para tickets.
+  - Se registra el resultado de insertar `orders` y `order_items`.
+  - Se captura especificamente el error de `stripe.checkout.sessions.create`.
+  - En desarrollo, los 500 devuelven JSON con `error`, `step` y `details`.
+  - En produccion, el mensaje sigue siendo seguro y generico.
+
+### Como probar
+
+1. Ejecutar `npm run dev`.
+2. Mantener Stripe CLI con `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
+3. Iniciar sesion en la app.
+4. Abrir `/app/vip`.
+5. Reservar una sala.
+6. Revisar la terminal de Next.js buscando logs con prefijo `[checkout]`.
+7. Si vuelve a responder 500, revisar el JSON de desarrollo para ver `step` y `details`.
+
+### Que queda pendiente
+
+- Retirar o reducir estos logs temporales cuando se identifique la causa.
+- Aplicar el fix real segun el paso que falle.
+- No se cambio la logica de negocio de Checkout.

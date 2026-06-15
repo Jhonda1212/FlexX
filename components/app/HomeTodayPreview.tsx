@@ -16,10 +16,19 @@ type TodayPost = {
   priority: string;
 };
 
+const homeFeedTypes = new Set(["promotion", "vip", "stage", "activity", "announcement"]);
+
 function toneForPriority(priority: string): "gold" | "danger" | "neutral" {
   if (priority === "urgent") return "danger";
   if (priority === "high") return "gold";
   return "neutral";
+}
+
+function pickHomePosts(posts: TodayPost[]) {
+  const nonEventPosts = posts.filter((post) => homeFeedTypes.has(post.type));
+  if (nonEventPosts.length > 0) return nonEventPosts.slice(0, 3);
+  const eventFallback = posts.find((post) => post.type === "event");
+  return eventFallback ? [eventFallback] : [];
 }
 
 export function HomeTodayPreview() {
@@ -42,10 +51,10 @@ export function HomeTodayPreview() {
           .or(`ends_at.is.null,ends_at.gte.${now}`)
           .order("is_pinned", { ascending: false })
           .order("created_at", { ascending: false })
-          .limit(3);
+          .limit(6);
 
         if (queryError) throw queryError;
-        if (active) setPosts((data ?? []) as TodayPost[]);
+        if (active) setPosts(pickHomePosts((data ?? []) as TodayPost[]));
       } catch (loadError) {
         if (active) setError(loadError instanceof Error ? loadError.message : "No se pudo cargar Hoy en FLEX.");
       } finally {
@@ -64,9 +73,12 @@ export function HomeTodayPreview() {
       <div className="mb-4 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Megaphone className="text-[var(--gold)]" size={20} />
-          <h2 className="text-sm font-bold uppercase tracking-[0.08em] text-white">Hoy en FLEX</h2>
+          <div>
+            <h2 className="text-sm font-bold uppercase tracking-[0.08em] text-white">Hoy en FLEX</h2>
+            <p className="mt-1 text-xs leading-5 text-[var(--muted)]">Promos, avisos y movimientos rápidos de la noche.</p>
+          </div>
         </div>
-        <Link href="/app/today" prefetch={false} className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--gold)]">Ver avisos</Link>
+        <Link href="/app/today" prefetch={false} className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--gold)]">Ver mural</Link>
       </div>
 
       {loading ? (
@@ -85,11 +97,11 @@ export function HomeTodayPreview() {
             <div>
               <p className="font-bold text-white">Hoy todavía está tranquilo</p>
               <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
-                Cuando haya promociones, actividades o avisos aparecerán aquí.
+                Promos, avisos y movimientos rápidos de la noche aparecerán aquí.
               </p>
             </div>
             <Link href="/app/today" prefetch={false} className="shrink-0">
-              <FlexButton variant="ghost" className="w-full sm:w-auto">Ver avisos</FlexButton>
+              <FlexButton variant="ghost" className="w-full sm:w-auto">Ver mural</FlexButton>
             </Link>
           </div>
         </div>

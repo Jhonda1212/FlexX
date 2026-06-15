@@ -59,6 +59,11 @@ export function AppShell({
   useEffect(() => {
     if (!staff || role) return;
     let active = true;
+    const timeoutId = window.setTimeout(() => {
+      if (!active) return;
+      setRoleError("No se pudo validar tu rol a tiempo. Revisa tu sesión y staff_profiles.");
+      setRoleLoading(false);
+    }, 8000);
 
     async function loadRole() {
       try {
@@ -82,6 +87,7 @@ export function AppShell({
       } catch (error) {
         if (active) setRoleError(error instanceof Error ? error.message : "No se pudo validar tu rol.");
       } finally {
+        window.clearTimeout(timeoutId);
         if (active) setRoleLoading(false);
       }
     }
@@ -89,6 +95,7 @@ export function AppShell({
     loadRole();
     return () => {
       active = false;
+      window.clearTimeout(timeoutId);
     };
   }, [role, staff]);
 
@@ -105,7 +112,7 @@ export function AppShell({
     return (
       <main className="grid min-h-screen place-items-center px-4">
         <div className="rounded-lg border border-white/10 bg-white/[0.03] p-6 text-sm text-[var(--muted)]">
-          Validando navegacion...
+          Validando navegación...
         </div>
       </main>
     );

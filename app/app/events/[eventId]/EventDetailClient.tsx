@@ -57,6 +57,8 @@ export function EventDetailClient({ eventId }: { eventId: string }) {
   const [ticketTiers, setTicketTiers] = useState<EventTicketTierView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [checkoutError, setCheckoutError] = useState("");
+  const [checkoutTierId, setCheckoutTierId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -92,6 +94,32 @@ export function EventDetailClient({ eventId }: { eventId: string }) {
       active = false;
     };
   }, [eventId]);
+
+  async function startTicketCheckout(tier: EventTicketTierView) {
+    setCheckoutError("");
+    setCheckoutTierId(tier.id);
+
+    try {
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          item_type: "ticket",
+          event_id: eventId,
+          ticket_tier_id: tier.id,
+          quantity: 1
+        })
+      });
+      const data = await response.json();
+      if (!response.ok || !data.url) {
+        throw new Error(data.error || "No se pudo iniciar el pago.");
+      }
+      window.location.href = data.url as string;
+    } catch (checkoutError) {
+      setCheckoutError(checkoutError instanceof Error ? checkoutError.message : "No se pudo iniciar el pago.");
+      setCheckoutTierId(null);
+    }
+  }
 
   if (loading) {
     return (
@@ -250,6 +278,11 @@ export function EventDetailClient({ eventId }: { eventId: string }) {
 
           {ticketTiers.length ? (
             <div className="space-y-3">
+              {checkoutError ? (
+                <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-100">
+                  {checkoutError}
+                </div>
+              ) : null}
               {ticketTiers.map((tier) => {
                 const availability = availabilityLabel(tier);
                 return (
@@ -268,7 +301,14 @@ export function EventDetailClient({ eventId }: { eventId: string }) {
                           <Users size={15} /> {availability}
                         </div>
                       ) : <span />}
-                      <FlexButton variant="ghost" className="min-h-10 px-4 text-xs">Seleccionar</FlexButton>
+                      <FlexButton
+                        variant="ghost"
+                        className="min-h-10 px-4 text-xs"
+                        loading={checkoutTierId === tier.id}
+                        onClick={() => startTicketCheckout(tier)}
+                      >
+                        Comprar
+                      </FlexButton>
                     </div>
                   </div>
                 );

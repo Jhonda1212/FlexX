@@ -19,7 +19,14 @@ export type FeedPostView = {
   is_published?: boolean;
   created_at?: string | null;
   club_zones?: { name?: string | null } | null;
-  events?: { title?: string | null; image_url?: string | null; cover_image_path?: string | null } | null;
+  events?: {
+    title?: string | null;
+    image_url?: string | null;
+    cover_image_path?: string | null;
+    artist_name?: string | null;
+    zone_name?: string | null;
+    starts_at?: string | null;
+  } | null;
 };
 
 export type FeedPostCta = {
@@ -109,9 +116,22 @@ export function getFeedPostImageUrl(post: Pick<FeedPostView, "image_url" | "even
   return post.image_url || post.events?.image_url || post.events?.cover_image_path || "";
 }
 
+function safeCtaUrl(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed) return "";
+  if (trimmed.startsWith("/")) return trimmed.startsWith("//") ? "" : trimmed;
+  if (!/^https:\/\//i.test(trimmed)) return "";
+
+  try {
+    return new URL(trimmed).href;
+  } catch {
+    return "";
+  }
+}
+
 export function getFeedPostCta(post: Pick<FeedPostView, "type" | "event_id" | "cta_label" | "cta_url" | "events">): FeedPostCta | null {
   const type = getSafeType(post.type);
-  const manualUrl = post.cta_url?.trim();
+  const manualUrl = safeCtaUrl(post.cta_url);
   if (manualUrl) {
     const fallbackLabel =
       type === "event" ? "Ver evento" :
@@ -119,7 +139,7 @@ export function getFeedPostCta(post: Pick<FeedPostView, "type" | "event_id" | "c
       type === "stage" ? "Participar" :
       type === "promotion" ? "Ver promo" :
       type === "activity" ? "Ver actividad" :
-      "Mas informacion";
+      "Más información";
     return {
       label: post.cta_label?.trim() || fallbackLabel,
       href: manualUrl
@@ -158,7 +178,7 @@ export function feedTimeLabel(post: Pick<FeedPostView, "starts_at" | "ends_at">)
 }
 
 function bodyPreview(body: string | null, limit: number) {
-  const fallback = "Anuncio oficial del equipo FLEX para seguir la noche con informacion clara.";
+  const fallback = "Anuncio oficial del equipo FLEX para seguir la noche con información clara.";
   const value = body?.trim() || fallback;
   return value.length > limit ? `${value.slice(0, limit - 3)}...` : value;
 }
@@ -173,6 +193,7 @@ export function FeedPostCard({ post, variant = "list", index = 0 }: { post: Feed
   const imageUrl = getFeedPostImageUrl(post) || visual.imageUrl || "";
   const cta = getFeedPostCta(post);
   const eventHref = safeType === "event" && post.event_id ? `/app/events/${post.event_id}` : null;
+  const zoneLabel = post.club_zones?.name || post.events?.zone_name || "";
 
   if (variant !== "list") {
     const featured = variant === "featured";
@@ -210,7 +231,7 @@ export function FeedPostCard({ post, variant = "list", index = 0 }: { post: Feed
           </div>
 
           <div>
-            <p className="text-sm font-semibold text-[var(--gold-bright)]">{post.club_zones?.name || formatRange(post.starts_at, post.ends_at)}</p>
+            <p className="text-sm font-semibold text-[var(--gold-bright)]">{zoneLabel || formatRange(post.starts_at, post.ends_at)}</p>
             <h2 className={`mt-2 max-w-3xl font-bold leading-tight text-white ${titleSize}`}>{post.title}</h2>
             {eventHref ? (
               <span className="mt-4 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-[var(--gold-bright)]">
@@ -293,10 +314,10 @@ export function FeedPostCard({ post, variant = "list", index = 0 }: { post: Feed
               <CalendarClock size={14} className="text-[var(--gold)]/80" />
               {formatRange(post.starts_at, post.ends_at)}
             </span>
-            {post.club_zones?.name ? (
+            {zoneLabel ? (
               <span className="inline-flex items-center gap-1.5">
                 <MapPin size={14} className="text-[var(--gold)]/80" />
-                {post.club_zones.name}
+                {zoneLabel}
               </span>
             ) : null}
           </div>
