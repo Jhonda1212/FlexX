@@ -20,24 +20,69 @@ type OrderWithItems = {
   order_items: OrderItem[];
 };
 
-function ok(received = true) {
-  return NextResponse.json({ received });
+type FulfillmentResult = {
+  alreadyFulfilled: boolean;
+  ticketsCreated: number;
+  privateRoomAccessCreated: number;
+};
+
+const isDev = process.env.NODE_ENV !== "production";
+
+function ok(payload: Record<string, unknown> = {}) {
+  return NextResponse.json({ received: true, ...payload });
 }
 
 function asString(value: unknown) {
   return typeof value === "string" ? value : null;
 }
 
-async function getOrderByCheckoutSession(sessionId: string) {
+function isUuid(value: string | null | undefined) {
+  return Boolean(value?.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i));
+}
+
+function logWebhookDebug(message: string, data: Record<string, unknown> = {}) {
+  if (!isDev) return;
+  console.info("[stripe-webhook]", message, data);
+}
+
+function logWebhookError(message: string, error: unknown, data: Record<string, unknown> = {}) {
+  if (!isDev) return;
+  console.error("[stripe-webhook]", message, {
+    ...data,
+    error: error instanceof Error ? { name: error.name, message: error.message } : { message: String(error) }
+  });
+}
+
+function eventMetadataOrderId(event: Stripe.Event) {
+  const object = event.data.object as {
+    metadata?: Stripe.Metadata | null;
+    client_reference_id?: string | null;
+  };
+
+  return object.metadata?.order_id ?? object.client_reference_id ?? null;
+}
+
+async function getOrderByCheckoutSession(sessionId: string, metadataOrderId?: string | null) {
   const admin = createSupabaseAdminClient();
+  const select = "id, user_id, status, amount_total_cents, currency, order_items(id, item_type, event_id, zone_id, quantity)";
   const { data, error } = await admin
     .from("orders")
-    .select("id, user_id, status, amount_total_cents, currency, order_items(id, item_type, event_id, zone_id, quantity)")
+    .select(select)
     .eq("stripe_checkout_session_id", sessionId)
     .maybeSingle();
 
   if (error) throw error;
-  return data as OrderWithItems | null;
+  if (data) return data as OrderWithItems;
+  if (!isUuid(metadataOrderId)) return null;
+
+  const { data: orderByMetadata, error: metadataError } = await admin
+    .from("orders")
+    .select(select)
+    .eq("id", metadataOrderId)
+    .maybeSingle();
+
+  if (metadataError) throw metadataError;
+  return orderByMetadata as OrderWithItems | null;
 }
 
 async function orderHasFulfillment(orderId: string) {
@@ -49,13 +94,29 @@ async function orderHasFulfillment(orderId: string) {
 
   if (ticketsError) throw ticketsError;
   if (accessError) throw accessError;
-  return Boolean(tickets?.length || accesses?.length);
+  return {
+    tickets: tickets?.length ?? 0,
+    privateRoomAccess: accesses?.length ?? 0,
+    hasAny: Boolean(tickets?.length || accesses?.length)
+  };
 }
 
-async function createFulfillment(order: OrderWithItems) {
-  if (await orderHasFulfillment(order.id)) return;
+async function createFulfillment(order: OrderWithItems): Promise<FulfillmentResult> {
+  const existingFulfillment = await orderHasFulfillment(order.id);
+  if (existingFulfillment.hasAny) {
+    return {
+      alreadyFulfilled: true,
+      ticketsCreated: 0,
+      privateRoomAccessCreated: 0
+    };
+  }
 
   const admin = createSupabaseAdminClient();
+  const result: FulfillmentResult = {
+    alreadyFulfilled: false,
+    ticketsCreated: 0,
+    privateRoomAccessCreated: 0
+  };
 
   for (const item of order.order_items ?? []) {
     if (item.item_type === "ticket") {
@@ -69,8 +130,9 @@ async function createFulfillment(order: OrderWithItems) {
       }));
 
       if (tickets.length) {
-        const { error } = await admin.from("tickets").insert(tickets);
+        const { data, error } = await admin.from("tickets").insert(tickets).select("id");
         if (error) throw error;
+        result.ticketsCreated += data?.length ?? 0;
       }
       continue;
     }
@@ -95,17 +157,32 @@ async function createFulfillment(order: OrderWithItems) {
       }));
 
       if (accesses.length) {
-        const { error } = await admin.from("private_room_access").insert(accesses);
+        const { data, error } = await admin.from("private_room_access").insert(accesses).select("id");
         if (error) throw error;
+        result.privateRoomAccessCreated += data?.length ?? 0;
       }
     }
   }
+
+  return result;
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const admin = createSupabaseAdminClient();
-  const order = await getOrderByCheckoutSession(session.id);
-  if (!order) return;
+  const metadataOrderId = session.metadata?.order_id ?? session.client_reference_id ?? null;
+  const order = await getOrderByCheckoutSession(session.id, metadataOrderId);
+  if (!order) {
+    logWebhookDebug("checkout.session.completed order not found", {
+      event_type: "checkout.session.completed",
+      order_id: metadataOrderId,
+      session_id: session.id
+    });
+    return {
+      orderId: metadataOrderId,
+      orderPassedToPaid: false,
+      fulfillment: null
+    };
+  }
 
   const sessionAmount = session.amount_total ?? 0;
   const sessionCurrency = session.currency?.toLowerCase() ?? "";
@@ -113,21 +190,46 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     throw new Error(`Stripe amount mismatch for order ${order.id}`);
   }
 
-  if (order.status === "paid") return;
+  let orderPassedToPaid = false;
 
-  const { error } = await admin
-    .from("orders")
-    .update({
-      status: "paid",
-      paid_at: new Date().toISOString(),
-      stripe_payment_intent_id: asString(session.payment_intent),
-      stripe_customer_id: asString(session.customer),
-      customer_email: session.customer_details?.email ?? session.customer_email ?? null
-    })
-    .eq("id", order.id);
+  if (order.status !== "paid") {
+    const { data: paidOrder, error } = await admin
+      .from("orders")
+      .update({
+        status: "paid",
+        paid_at: new Date().toISOString(),
+        stripe_checkout_session_id: session.id,
+        stripe_payment_intent_id: asString(session.payment_intent),
+        stripe_customer_id: asString(session.customer),
+        customer_email: session.customer_details?.email ?? session.customer_email ?? null
+      })
+      .eq("id", order.id)
+      .neq("status", "paid")
+      .select("id")
+      .maybeSingle();
 
-  if (error) throw error;
-  await createFulfillment({ ...order, status: "paid" });
+    if (error) throw error;
+    orderPassedToPaid = Boolean(paidOrder);
+  }
+
+  const fulfillment = await createFulfillment({ ...order, status: "paid" });
+
+  logWebhookDebug("checkout.session.completed processed", {
+    event_type: "checkout.session.completed",
+    order_id: order.id,
+    metadata_order_id: metadataOrderId,
+    order_passed_to_paid: orderPassedToPaid,
+    order_already_paid: order.status === "paid",
+    fulfillment_already_exists: fulfillment.alreadyFulfilled,
+    tickets_created: fulfillment.ticketsCreated,
+    private_room_access_created: fulfillment.privateRoomAccessCreated
+  });
+
+  return {
+    orderId: order.id,
+    orderPassedToPaid,
+    fulfillment
+  };
 }
 
 async function handleCheckoutExpired(session: Stripe.Checkout.Session) {
@@ -180,10 +282,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid Stripe webhook signature" }, { status: 400 });
   }
 
+  const metadataOrderId = eventMetadataOrderId(event);
+  logWebhookDebug("event received", {
+    event_type: event.type,
+    order_id: metadataOrderId
+  });
+
   try {
+    let result: Record<string, unknown> = {};
+
     switch (event.type) {
       case "checkout.session.completed":
-        await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session);
+        result = { checkout: await handleCheckoutCompleted(event.data.object as Stripe.Checkout.Session) };
         break;
       case "checkout.session.expired":
         await handleCheckoutExpired(event.data.object as Stripe.Checkout.Session);
@@ -195,11 +305,20 @@ export async function POST(request: Request) {
         await handleChargeRefunded(event.data.object as Stripe.Charge);
         break;
       default:
-        break;
+        logWebhookDebug("event ignored", {
+          event_type: event.type,
+          order_id: metadataOrderId,
+          ignored: true
+        });
+        return ok({ ignored: true });
     }
 
-    return ok();
+    return ok(result);
   } catch (error) {
+    logWebhookError("event processing failed", error, {
+      event_type: event.type,
+      order_id: metadataOrderId
+    });
     const message = error instanceof Error ? error.message : "Stripe webhook processing failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }

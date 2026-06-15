@@ -96,6 +96,14 @@ export type TicketView = {
   createdAt: string;
 };
 
+export type CheckoutOrderSummary = {
+  id: string;
+  status: "pending" | "paid" | "failed" | "refunded";
+  itemType: "ticket" | "vip_reservation" | null;
+  hasTickets: boolean;
+  hasPrivateRoomAccess: boolean;
+};
+
 export type StorageView = {
   id: string;
   storageNumber: string;
@@ -383,6 +391,46 @@ export async function listUserTickets(): Promise<TicketView[]> {
       createdAt: ticket.created_at as string
     };
   });
+}
+
+export async function getCheckoutOrderSummary(sessionId: string): Promise<CheckoutOrderSummary | null> {
+  if (mocksEnabled()) return null;
+
+  const normalizedSessionId = sessionId.trim();
+  if (!normalizedSessionId) return null;
+
+  const { supabase, userId } = await getSupabaseUserId();
+  if (!userId) throw new Error("Debes iniciar sesion para ver el resultado del checkout.");
+
+  const { data: order, error: orderError } = await supabase
+    .from("orders")
+    .select("id, status")
+    .eq("user_id", userId)
+    .eq("stripe_checkout_session_id", normalizedSessionId)
+    .maybeSingle();
+
+  if (orderError) throw orderError;
+  if (!order) return null;
+
+  const [{ data: items, error: itemsError }, { data: tickets, error: ticketsError }, { data: accesses, error: accessError }] = await Promise.all([
+    supabase.from("order_items").select("item_type").eq("order_id", order.id).limit(1),
+    supabase.from("tickets").select("id").eq("order_id", order.id).limit(1),
+    supabase.from("private_room_access").select("id").eq("order_id", order.id).limit(1)
+  ]);
+
+  if (itemsError) throw itemsError;
+  if (ticketsError) throw ticketsError;
+  if (accessError) throw accessError;
+
+  const itemType = items?.[0]?.item_type;
+
+  return {
+    id: order.id as string,
+    status: order.status as CheckoutOrderSummary["status"],
+    itemType: itemType === "ticket" || itemType === "vip_reservation" ? itemType : null,
+    hasTickets: Boolean(tickets?.length),
+    hasPrivateRoomAccess: Boolean(accesses?.length)
+  };
 }
 
 export async function listActiveStorageItems(): Promise<StorageView[]> {

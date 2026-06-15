@@ -7645,3 +7645,48 @@ Se agrego diagnostico acotado a desarrollo para investigar por que `POST /api/ch
 - Retirar o reducir estos logs temporales cuando se identifique la causa.
 - Aplicar el fix real segun el paso que falle.
 - No se cambio la logica de negocio de Checkout.
+
+## Fase actual: webhook Stripe robusto e idempotente - 2026-06-15
+
+### Contexto
+
+Stripe CLI puede enviar eventos auxiliares como `payment_intent.created`, `payment_intent.succeeded` o `charge.updated`. Esos eventos no deben romper el webhook de FLEX si no forman parte del fulfillment operativo.
+
+### Cambios realizados
+
+- `app/api/stripe/webhook/route.ts`
+  - `checkout.session.completed` sigue siendo el evento que confirma la orden.
+  - Busca la orden por `stripe_checkout_session_id` y usa `metadata.order_id` o `client_reference_id` como fallback.
+  - Valida importe y divisa antes de marcar la orden como `paid`.
+  - Si la orden no estaba pagada, actualiza `orders.status = paid`, `paid_at`, `stripe_payment_intent_id`, `stripe_customer_id` y `customer_email`.
+  - Si la orden ya estaba `paid`, no duplica el pago pero revisa si falta fulfillment.
+  - Antes de crear fulfillment comprueba si ya existen `tickets` o `private_room_access` para el `order_id`.
+  - Para `ticket`, crea filas en `tickets`.
+  - Para `vip_reservation`, crea filas en `private_room_access` y no crea tickets.
+  - Eventos no manejados responden `200` con `{ received: true, ignored: true }`.
+  - En desarrollo agrega logs seguros con prefijo `[stripe-webhook]`: `event_type`, `order_id`, si la orden paso a `paid`, si habia fulfillment previo, tickets creados, accesos VIP creados y eventos ignorados.
+  - No se imprimen secretos ni payloads completos de Stripe.
+- `app/api/checkout/route.ts`
+  - La URL de exito agrega `item_type` para que el frontend distinga compras VIP de entradas al volver de Stripe.
+- `lib/flex-actions.ts`
+  - Se agrego `getCheckoutOrderSummary(sessionId)` para leer la orden propia del usuario y detectar si fue ticket o VIP.
+- `app/app/tickets/page.tsx`
+  - Si `checkout=success` corresponde a VIP, muestra `Reserva VIP recibida` y enlaces a `/app/vip` y `/app/profile`.
+  - Evita mostrar `Aun no tienes entradas` como si una reserva VIP hubiera fallado.
+
+### Como probar
+
+1. Ejecutar `npm run dev`.
+2. Ejecutar `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
+3. Comprar una entrada normal desde `/app/events/[eventId]`.
+4. Confirmar que `checkout.session.completed` marca la orden `paid` y crea `tickets`.
+5. Reservar una sala desde `/app/vip`.
+6. Confirmar que `checkout.session.completed` marca la orden `paid` y crea `private_room_access`, sin crear `tickets`.
+7. Reenviar el mismo evento desde Stripe CLI y confirmar que responde `200` sin duplicar fulfillment.
+8. Enviar eventos auxiliares como `payment_intent.created`, `payment_intent.succeeded` o `charge.updated` y confirmar `200` con `ignored:true`.
+9. Volver a `/app/tickets?checkout=success&item_type=vip...` y confirmar que muestra mensaje de reserva VIP en lugar del empty state de entradas.
+
+### Que queda pendiente
+
+- Revisar si se quiere una pantalla dedicada de reservas VIP activas.
+- Considerar una proteccion transaccional en base de datos si se espera alta concurrencia de eventos duplicados simultaneos.
