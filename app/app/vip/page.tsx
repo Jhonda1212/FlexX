@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowRight, Crown, Users } from "lucide-react";
 import { AppEmptyState } from "@/components/app/AppEmptyState";
 import { AppPageHeader } from "@/components/app/AppPageHeader";
@@ -149,9 +149,33 @@ export default function VipPage() {
   const [error, setError] = useState("");
   const [checkoutRoomId, setCheckoutRoomId] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState("");
+  const [checkoutNotice, setCheckoutNotice] = useState<"success" | "cancel" | null>(null);
 
-  useEffect(() => {
+  const updateCheckoutNotice = useCallback(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkout = params.get("checkout");
+    const itemType = params.get("item_type");
+
+    if (checkout === "success" && itemType === "vip") {
+      setCheckoutNotice("success");
+      return;
+    }
+
+    if (checkout === "cancel" || checkout === "cancelled") {
+      setCheckoutNotice("cancel");
+      return;
+    }
+
+    setCheckoutNotice(null);
+  }, []);
+
+  const loadRooms = useCallback((showSkeleton = false) => {
     let active = true;
+    if (showSkeleton) {
+      setLoading(true);
+    }
+    setError("");
+
     listVipRooms()
       .then((data) => {
         if (active) setRooms(data);
@@ -166,6 +190,30 @@ export default function VipPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    updateCheckoutNotice();
+    return loadRooms(true);
+  }, [loadRooms, updateCheckoutNotice]);
+
+  useEffect(() => {
+    function handlePageRestore() {
+      setCheckoutRoomId(null);
+      setCheckoutError("");
+      updateCheckoutNotice();
+      loadRooms(false);
+    }
+
+    window.addEventListener("pageshow", handlePageRestore);
+    window.addEventListener("popstate", handlePageRestore);
+    window.addEventListener("focus", handlePageRestore);
+
+    return () => {
+      window.removeEventListener("pageshow", handlePageRestore);
+      window.removeEventListener("popstate", handlePageRestore);
+      window.removeEventListener("focus", handlePageRestore);
+    };
+  }, [loadRooms, updateCheckoutNotice]);
 
   async function startVipCheckout(room: VipRoom) {
     setCheckoutError("");
@@ -185,12 +233,15 @@ export default function VipPage() {
       if (!response.ok || !data.url) {
         throw new Error(data.error || "No se pudo iniciar el pago.");
       }
-      window.location.href = data.url as string;
+      window.location.assign(data.url as string);
     } catch (checkoutError) {
       setCheckoutError(checkoutError instanceof Error ? checkoutError.message : "No se pudo iniciar el pago.");
       setCheckoutRoomId(null);
     }
   }
+
+  const showSkeleton = loading && rooms.length === 0;
+  const hasRooms = rooms.length > 0;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -207,7 +258,19 @@ export default function VipPage() {
         }
       />
 
-      {loading ? (
+      {checkoutNotice === "success" ? (
+        <FlexCard tone="success">
+          <p className="text-green-100">Reserva recibida. Estamos confirmando tu acceso VIP.</p>
+        </FlexCard>
+      ) : null}
+
+      {checkoutNotice === "cancel" ? (
+        <FlexCard tone="gold">
+          <p className="text-[var(--gold-bright)]">Reserva cancelada. Puedes intentarlo de nuevo.</p>
+        </FlexCard>
+      ) : null}
+
+      {showSkeleton ? (
         <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
           <FlexSkeleton className="h-[390px] rounded-xl" />
           <FlexSkeleton className="h-[390px] rounded-xl" />
@@ -226,7 +289,7 @@ export default function VipPage() {
         </FlexCard>
       ) : null}
 
-      {!loading && !error && rooms.length === 0 ? (
+      {!loading && !error && !hasRooms ? (
         <AppEmptyState
           icon={<Users size={24} />}
           title="Aun no hay salas disponibles"
@@ -235,7 +298,7 @@ export default function VipPage() {
         />
       ) : null}
 
-      {!loading && !error && rooms.length > 0 ? (
+      {!showSkeleton && hasRooms ? (
         <div className="grid items-stretch gap-4 md:grid-cols-2 2xl:grid-cols-3">
           {rooms.map((room) => (
             <RoomCard key={room.id} room={room} loading={checkoutRoomId === room.id} onReserve={startVipCheckout} />
