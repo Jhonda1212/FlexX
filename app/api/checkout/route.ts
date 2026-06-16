@@ -26,6 +26,21 @@ const isDev = process.env.NODE_ENV !== "production";
 
 type CheckoutDebugData = Record<string, unknown>;
 
+function envFingerprint(value: string | undefined) {
+  if (!value) {
+    return { exists: false };
+  }
+
+  if (value.length <= 8) {
+    return { exists: true, preview: "<set-short>" };
+  }
+
+  return {
+    exists: true,
+    preview: `${value.slice(0, 4)}...${value.slice(-4)}`
+  };
+}
+
 function logCheckoutDebug(message: string, data?: CheckoutDebugData) {
   if (!isDev) return;
   console.info("[checkout]", message, data ?? {});
@@ -89,6 +104,19 @@ function devJsonError(message: string, step: string, error: unknown, status = 50
   const details = typeof serialized === "object" && "message" in serialized
     ? String(serialized.message)
     : "Unknown checkout error";
+
+  return NextResponse.json(
+    {
+      error: "Checkout failed",
+      step,
+      details
+    },
+    { status }
+  );
+}
+
+function checkoutJsonError(message: string, step: string, details: string, status = 400) {
+  if (!isDev) return jsonError(message, status);
 
   return NextResponse.json(
     {
@@ -233,9 +261,13 @@ export async function POST(request: Request) {
   try {
     step = "env-check";
     logCheckoutDebug("environment check", {
-      has_STRIPE_SECRET_KEY: Boolean(process.env.STRIPE_SECRET_KEY),
-      has_SUPABASE_SERVICE_ROLE_KEY: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
-      has_NEXT_PUBLIC_SUPABASE_URL: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL)
+      NEXT_PUBLIC_SUPABASE_URL: envFingerprint(process.env.NEXT_PUBLIC_SUPABASE_URL),
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: envFingerprint(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY),
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: envFingerprint(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+      SUPABASE_SERVICE_ROLE_KEY: envFingerprint(process.env.SUPABASE_SERVICE_ROLE_KEY),
+      STRIPE_SECRET_KEY: envFingerprint(process.env.STRIPE_SECRET_KEY),
+      NEXT_PUBLIC_APP_URL: envFingerprint(process.env.NEXT_PUBLIC_APP_URL),
+      NODE_ENV: process.env.NODE_ENV
     });
 
     step = "parse-payload";
@@ -247,10 +279,10 @@ export async function POST(request: Request) {
     const itemType = body.item_type;
 
     if (itemType !== "ticket" && itemType !== "vip") {
-      return jsonError("Tipo de compra invalido.");
+      return checkoutJsonError("Tipo de compra invalido.", step, `item_type recibido: ${String(itemType)}`);
     }
     if (itemType === "vip" && quantity !== 1) {
-      return jsonError("Las reservas VIP se compran de una en una.");
+      return checkoutJsonError("Las reservas VIP se compran de una en una.", step, `quantity recibido: ${quantity}`);
     }
 
     step = "auth";
@@ -264,7 +296,7 @@ export async function POST(request: Request) {
     if (userError) throw userError;
     const user = userData.user;
     if (!user) {
-      return jsonError("Debes iniciar sesion para comprar.", 401);
+      return checkoutJsonError("Debes iniciar sesion para comprar.", step, "supabase.auth.getUser no devolvio usuario.", 401);
     }
 
     step = "create-admin-client";

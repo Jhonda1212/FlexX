@@ -7646,6 +7646,61 @@ Se agrego diagnostico acotado a desarrollo para investigar por que `POST /api/ch
 - Aplicar el fix real segun el paso que falle.
 - No se cambio la logica de negocio de Checkout.
 
+## Fase actual: correccion local de Stripe Checkout en `/app/vip` - 2026-06-16
+
+### Causa encontrada
+
+En este computador `POST /api/checkout` fallaba antes de crear la sesion de Stripe por dos problemas locales:
+
+- `.env.local` no tenia `SUPABASE_SERVICE_ROLE_KEY`, necesaria para crear el cliente admin de Supabase en `app/api/checkout/route.ts`.
+- La base Supabase local no tenia aplicada la migracion `20260615110000_add_stripe_checkout_to_orders.sql`, por lo que faltaban columnas usadas por Checkout en `orders`, `order_items` y `tickets`.
+
+No era un problema de diseno ni de la pagina `/app/vip`. Los datos base VIP si existian: habia 3 salas `private_room` activas con `vip_price_cents > 0`.
+
+### Cambios realizados
+
+- `app/api/checkout/route.ts`
+  - Se ampliaron los logs seguros solo en desarrollo.
+  - El chequeo de entorno ahora registra existencia y huella parcial de `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY` y `NEXT_PUBLIC_APP_URL`.
+  - Las respuestas de desarrollo para errores esperados de payload/auth devuelven `{ error, step, details }`.
+  - No se imprimen claves completas ni emails.
+- `.env.local`
+  - Se agrego `SUPABASE_SERVICE_ROLE_KEY` usando el valor local de `npx supabase status`.
+- Base local Supabase
+  - Se ejecuto `npx.cmd supabase migration up --local`.
+  - Quedaron aplicadas `20260615100000_harden_daily_feed_posts_admin_rls.sql` y `20260615110000_add_stripe_checkout_to_orders.sql`.
+
+### Verificaciones realizadas
+
+- `.env.local` contiene valores reales y no los vacios de `.env.example`.
+- `NEXT_PUBLIC_SUPABASE_URL` coincide con `http://127.0.0.1:54321`.
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` coincide con la publishable key reportada por Supabase local.
+- La migracion `add_stripe_checkout_to_orders` figura en `supabase_migrations.schema_migrations` con version `20260615110000`.
+- Columnas presentes tras migrar:
+  - `orders.stripe_customer_id`
+  - `orders.customer_email`
+  - `orders.paid_at`
+  - `order_items.ticket_tier_id`
+  - `order_items.total_amount_cents`
+  - `tickets.zone_id`
+- Datos VIP presentes:
+  - 3 filas `club_zones.type = 'private_room'`
+  - todas activas
+  - precio minimo activo `12000` centimos
+
+### Como probar
+
+1. Reiniciar `npm run dev` para que Next.js recargue `.env.local`.
+2. Iniciar sesion con un usuario real local.
+3. Abrir `/app/vip`.
+4. Reservar una sala VIP activa.
+5. Si falla, revisar el JSON de desarrollo de `/api/checkout` y los logs `[checkout]` para identificar `step` y `details`.
+
+### Que queda pendiente
+
+- Mantener Stripe CLI escuchando si se quiere completar el webhook local: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
+- Reducir los logs de diagnostico cuando el flujo quede estable.
+
 ## Fase actual: webhook Stripe robusto e idempotente - 2026-06-15
 
 ### Contexto
