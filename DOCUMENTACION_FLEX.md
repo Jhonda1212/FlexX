@@ -7701,6 +7701,77 @@ No era un problema de diseno ni de la pagina `/app/vip`. Los datos base VIP si e
 - Mantener Stripe CLI escuchando si se quiere completar el webhook local: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
 - Reducir los logs de diagnostico cuando el flujo quede estable.
 
+## Fase actual: configuracion Supabase local versionada - 2026-06-16
+
+### Contexto
+
+Para que FLEX sea reproducible en varios computadores con Supabase local + Docker, el proyecto debe versionar `supabase/config.toml`. Este archivo define puertos, servicios locales, schemas expuestos, Auth, Storage, migraciones y seed. No contiene secretos reales.
+
+### Cambios realizados
+
+- Se creo `supabase/config.toml` con `npx.cmd supabase init`.
+- Se mantuvieron intactos `supabase/migrations` y `supabase/seed.sql`.
+- Se ajusto la configuracion local principal:
+  - API local habilitada en puerto `54321`.
+  - DB local en puerto `54322`.
+  - Studio local habilitado en puerto `54323`.
+  - Schemas expuestos: `public`, `storage`, `graphql_public`.
+  - Storage habilitado.
+  - Auth local habilitado.
+  - Seed local configurado con `./seed.sql`.
+- Se creo `supabase/.gitignore` para ignorar archivos locales de Supabase y env dentro de `supabase/`.
+- Se verifico que `.gitignore` raiz ignora `.env*.local` y mantiene `.env.example` versionable.
+
+### Flujo para configurar un PC nuevo
+
+1. Descargar cambios:
+   ```bash
+   git pull
+   ```
+2. Instalar dependencias:
+   ```bash
+   npm install
+   ```
+3. Levantar Supabase local con Docker:
+   ```bash
+   npx supabase start
+   ```
+4. Aplicar migraciones pendientes sin borrar datos:
+   ```bash
+   npx supabase migration up --local
+   ```
+5. Ver variables locales generadas por Supabase:
+   ```bash
+   npx supabase status
+   ```
+6. Copiar a `.env.local` los valores locales necesarios:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - variables Stripe locales o de test
+   - `NEXT_PUBLIC_APP_URL=http://localhost:3000`
+7. Ejecutar la app:
+   ```bash
+   npm run dev
+   ```
+
+### Recrear todo desde cero
+
+Cuando se quiera reconstruir la base local completa desde migraciones y seed:
+
+```bash
+npx supabase db reset
+```
+
+Advertencia: `db reset` borra datos locales, incluyendo usuarios en `auth.users`, `profiles`, `staff_profiles`, ordenes, tickets y datos creados manualmente. Solo debe usarse cuando se quiera recrear todo desde cero.
+
+### Que sigue siendo local
+
+- `.env.local` no se versiona y debe configurarse en cada PC.
+- `auth.users` no se sincroniza por Git.
+- Usuarios, sesiones, perfiles locales, ordenes, tickets y datos creados manualmente no viajan entre computadores.
+- Docker volumes locales conservan el estado de cada PC hasta que se haga `db reset` o se borren los volumenes.
+
 ## Fase actual: webhook Stripe robusto e idempotente - 2026-06-15
 
 ### Contexto
