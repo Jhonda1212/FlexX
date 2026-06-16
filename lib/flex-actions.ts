@@ -96,6 +96,23 @@ export type TicketView = {
   createdAt: string;
 };
 
+export type PrivateRoomAccessView = {
+  id: string;
+  userId: string;
+  zoneId: string;
+  orderId: string | null;
+  qrToken: string;
+  active: boolean;
+  status: string;
+  createdAt: string;
+  maxGuests: number;
+  zoneName: string;
+  zoneFloor: number | null;
+  zoneCapacity: number | null;
+  eventName: string | null;
+  eventStartsAt: string | null;
+};
+
 export type CheckoutOrderSummary = {
   id: string;
   status: "pending" | "paid" | "failed" | "refunded";
@@ -127,6 +144,20 @@ function mapTicketStatus(status: string): TicketView["status"] {
   if (status === "active") return "valid";
   if (status === "used" || status === "expired" || status === "cancelled") return status;
   return "cancelled";
+}
+
+function firstRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+function extractQrToken(value: string) {
+  const trimmed = value.trim();
+  const parts = trimmed.split(":");
+  if (parts.length >= 4 && parts[0] === "FLEX" && (parts[1] === "VIP" || parts[1] === "TICKET")) {
+    return parts.slice(3).join(":").trim();
+  }
+  return trimmed;
 }
 
 function normalizeImageCandidate(value: string | null | undefined) {
@@ -393,6 +424,55 @@ export async function listUserTickets(): Promise<TicketView[]> {
   });
 }
 
+export async function listUserPrivateRoomAccess(): Promise<PrivateRoomAccessView[]> {
+  if (mocksEnabled()) return [];
+
+  const { supabase, userId } = await getSupabaseUserId();
+  if (!userId) throw new Error("Debes iniciar sesion para ver tus reservas VIP.");
+
+  const { data, error } = await supabase
+    .from("private_room_access")
+    .select(`
+      id,
+      user_id,
+      zone_id,
+      order_id,
+      qr_token,
+      active,
+      status,
+      created_at,
+      max_guests,
+      club_zones(name, capacity, floor),
+      events(title, starts_at)
+    `)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  return (data ?? []).map((access) => {
+    const zone = firstRelation(access.club_zones as { name?: string | null; capacity?: number | null; floor?: number | null } | { name?: string | null; capacity?: number | null; floor?: number | null }[] | null);
+    const event = firstRelation(access.events as { title?: string | null; starts_at?: string | null } | { title?: string | null; starts_at?: string | null }[] | null);
+
+    return {
+      id: access.id as string,
+      userId: access.user_id as string,
+      zoneId: access.zone_id as string,
+      orderId: (access.order_id as string | null) ?? null,
+      qrToken: access.qr_token as string,
+      active: Boolean(access.active),
+      status: (access.status as string | null) ?? (access.active ? "confirmed" : "inactive"),
+      createdAt: access.created_at as string,
+      maxGuests: Number(access.max_guests ?? 10),
+      zoneName: zone?.name ?? "Sala VIP",
+      zoneFloor: typeof zone?.floor === "number" ? zone.floor : null,
+      zoneCapacity: typeof zone?.capacity === "number" ? zone.capacity : null,
+      eventName: event?.title ?? null,
+      eventStartsAt: event?.starts_at ?? null
+    };
+  });
+}
+
 export async function getCheckoutOrderSummary(sessionId: string): Promise<CheckoutOrderSummary | null> {
   if (mocksEnabled()) return null;
 
@@ -580,15 +660,17 @@ export async function createStorageItem(input: {
 }
 
 export async function validateQrToken(token: string) {
+  const normalizedToken = extractQrToken(token);
+
   if (mocksEnabled()) {
-    const result = validateMockTicket(token);
+    const result = validateMockTicket(normalizedToken);
     return { status: result.result, message: result.message, source: "mock" as const };
   }
 
   try {
     const supabase = createBrowserSupabase();
     const { data, error } = await supabase
-      .rpc("validate_qr_token", { input_token: token })
+      .rpc("validate_qr_token", { input_token: normalizedToken })
       .single();
     if (error) throw error;
     const result = data as { status: string; message: string };

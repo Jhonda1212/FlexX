@@ -8135,6 +8135,75 @@ npm run dev
 
 Despues de aplicar, un usuario normal autenticado podra consultar su ausencia de rol sin error y seguira sin poder insertarse o actualizarse en `staff_profiles`.
 
+## Correccion de `secure_token()` para QR - 2026-06-16
+
+### Problema
+
+El webhook de Stripe fallaba en `checkout.session.completed` al insertar una reserva VIP en `private_room_access`. El payload era correcto, pero el default de `private_room_access.qr_token` llamaba a `public.secure_token()`.
+
+La funcion original usaba:
+
+```sql
+encode(gen_random_bytes(32), 'base64url')
+```
+
+PostgreSQL local/Supabase no reconoce `base64url` como encoding valido y devolvia:
+
+```text
+code: 22023
+message: unrecognized encoding: "base64url"
+```
+
+### Cambio aplicado
+
+Se agrego la migracion `supabase/migrations/20260616143000_fix_secure_token_hex_encoding.sql`:
+
+```sql
+create or replace function public.secure_token()
+returns text
+language sql
+volatile
+as $$
+  select encode(gen_random_bytes(24), 'hex');
+$$;
+```
+
+Los defaults existentes de `tickets.qr_token`, `private_room_access.qr_token` y otros campos que llaman `public.secure_token()` siguen funcionando, pero ahora generan tokens hex seguros de 48 caracteres.
+
+Durante la aplicacion local tambien se corrigio el timestamp duplicado de la migracion de productos, renombrandola a `supabase/migrations/20260616121000_products_catalog.sql`. Supabase usa el timestamp como version unica, por eso dos archivos `20260616120000_*.sql` bloqueaban `migration up`.
+
+## Correccion de QR VIP en `/app/tickets` - 2026-06-16
+
+### Problema
+
+Despues de que Stripe confirmaba una reserva VIP, `/app/tickets` mostraba el banner `Reserva VIP confirmada. Tu acceso privado ya esta activo`, pero no mostraba QR. La causa era que la pagina solo cargaba `tickets` y usaba `private_room_access` como booleano dentro de `getCheckoutOrderSummary()`. No existia una consulta que trajera los accesos VIP reales para renderizarlos.
+
+### Cambio aplicado
+
+- `lib/flex-actions.ts`
+  - Se agrego `listUserPrivateRoomAccess()` para leer los accesos VIP del usuario desde `private_room_access`.
+  - La consulta trae `id`, `user_id`, `zone_id`, `order_id`, `qr_token`, `active`, `status`, `created_at`, `max_guests` y datos de `club_zones`.
+  - `validateQrToken()` ahora acepta QR envueltos como `FLEX:VIP:<access_id>:<qr_token>` y `FLEX:TICKET:<ticket_id>:<qr_token>`, extrayendo el token real antes de llamar a `validate_qr_token`.
+- `app/app/tickets/page.tsx`
+  - Ahora carga en paralelo entradas normales y reservas VIP.
+  - Renderiza seccion `Reservas VIP` con QR, codigo, sala, estado, capacidad, fecha, copiar codigo y compartir por WhatsApp.
+  - El polling post-checkout sigue activo mientras no exista fulfillment.
+
+### Valores QR
+
+- VIP: `FLEX:VIP:<access_id>:<qr_token>`
+- Entrada: `FLEX:TICKET:<ticket_id>:<qr_token>`
+
+El QR no contiene service role, secretos ni datos privados sensibles.
+
+### Como probar
+
+1. Aplicar migraciones con `npx supabase migration up --local`.
+2. Reiniciar `npm run dev`.
+3. Hacer una compra VIP nueva con Stripe test `4242`.
+4. Confirmar que `checkout.session.completed` devuelve `200`.
+5. Revisar `private_room_access`: debe existir una fila con `order_id`, `user_id`, `zone_id`, `status = confirmed`, `active = true` y `qr_token`.
+
 ## Fase actual: webhook Stripe robusto e idempotente - 2026-06-15
 
 ### Contexto
@@ -8190,7 +8259,7 @@ Stripe CLI puede enviar eventos auxiliares como `payment_intent.created`, `payme
 - Se amplio el catalogo a un conjunto mas realista de productos de discoteca con botellas, refrescos, energéticas, cachimbas, merch, reservas y packs.
 - Se agruparon los productos por categorias con chips de navegacion y se priorizaron los destacados dentro del catalogo.
 - Se creo `lib/products/service.ts` como capa de acceso a datos para Supabase con `getProducts()`, `getActiveProducts()`, `getProductsByCategory()` y `getFeaturedProducts()`.
-- Se creo la migracion `supabase/migrations/20260616120000_products_catalog.sql` con la tabla `products`, indices, RLS y policies.
+- Se creo la migracion `supabase/migrations/20260616121000_products_catalog.sql` con la tabla `products`, indices, RLS y policies.
 - Se extendio `supabase/seed.sql` con el seed inicial de productos para que `supabase db reset` regenere el catalogo.
 - Se actualizo `lib/products/cart-store.ts` para seguir deduplicando y persistiendo el carrito sin depender del catalogo mock local.
 - Se actualizo `lib/products/checkout.ts` para validar el carrito contra productos reales de Supabase antes de preparar el checkout.
