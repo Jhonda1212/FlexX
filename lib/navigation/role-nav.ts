@@ -11,6 +11,7 @@ import {
   Mic2,
   Music,
   QrCode,
+  ShoppingBag,
   Shirt,
   Ticket,
   Users
@@ -25,6 +26,7 @@ export const userNav: NavItem[] = [
   { href: "/app/today", label: "Hoy", icon: Megaphone },
   { href: "/app/song-request", label: "Canción", icon: Music },
   { href: "/app/my-turn", label: "Mi turno", icon: Mic2 },
+  { href: "/app/products", label: "Productos", icon: ShoppingBag },
   { href: "/app/tickets", label: "Entradas", icon: QrCode },
   { href: "/app/vip", label: "VIP", icon: Crown },
   { href: "/app/profile", label: "Perfil", icon: Users },

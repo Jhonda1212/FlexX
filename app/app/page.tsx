@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Crown, Mic2, Music, QrCode, Sparkles } from "lucide-react";
+import { ArrowRight, Crown, Mic2, Music, QrCode, ShoppingBag, Sparkles } from "lucide-react";
 import { HomeEventCarousel } from "@/components/app/HomeEventCarousel";
 import { HomeTodayPreview } from "@/components/app/HomeTodayPreview";
 import { HomeUpcomingEvents } from "@/components/app/HomeUpcomingEvents";
@@ -8,10 +8,11 @@ import { FlexButton } from "@/components/ui/FlexButton";
 import { FlexCard } from "@/components/ui/FlexCard";
 
 const quickActions = [
-  { href: "/app/song-request", label: "Pedir canción", helper: "Envía tu tema al DJ", icon: Music },
-  { href: "/app/my-turn", label: "Mi turno", helper: "Consulta tu posición", icon: Mic2 },
+  { href: "/app/song-request", label: "Pedir cancion", helper: "Envia tu tema al DJ", icon: Music },
+  { href: "/app/my-turn", label: "Mi turno", helper: "Consulta tu posicion", icon: Mic2 },
   { href: "/app/tickets", label: "Mis entradas", helper: "Muestra tu QR", icon: QrCode },
-  { href: "/app/vip", label: "Salas VIP", helper: "Reserva para tu grupo", icon: Crown }
+  { href: "/app/vip", label: "Salas VIP", helper: "Reserva para tu grupo", icon: Crown },
+  { href: "/app/products", label: "Productos", helper: "Barra y merch en un solo carrito", icon: ShoppingBag }
 ];
 
 export default function UserDashboard() {
@@ -28,7 +29,7 @@ export default function UserDashboard() {
 
         <section className="content-auto soft-enter soft-enter-delay-1">
           <div className="mb-4 flex items-center justify-between gap-4">
-            <h2 className="text-sm font-bold uppercase tracking-[0.08em] text-white">Accesos rápidos</h2>
+            <h2 className="text-sm font-bold uppercase tracking-[0.08em] text-white">Accesos rapidos</h2>
             <Sparkles className="text-[var(--gold)]" size={18} />
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -67,7 +68,7 @@ export default function UserDashboard() {
           </div>
           <div className="flex items-center justify-between gap-4">
             <div>
-              <div className="text-sm text-[var(--muted)]">Tu posición estimada</div>
+              <div className="text-sm text-[var(--muted)]">Tu posicion estimada</div>
               <div className="mt-2 text-5xl font-bold text-[var(--gold)]">#4</div>
               <div className="mt-3 text-sm text-white/72">20 - 30 min</div>
             </div>
@@ -85,7 +86,7 @@ export default function UserDashboard() {
             <div className="min-w-0">
               <div className="font-bold text-white">Jazz Nights</div>
               <div className="mt-1 text-sm text-[var(--muted)]">Entrada general</div>
-              <div className="mt-3"><FlexBadge tone="success">Válida</FlexBadge></div>
+              <div className="mt-3"><FlexBadge tone="success">Valida</FlexBadge></div>
             </div>
           </div>
           <Link href="/app/tickets" prefetch={false}><FlexButton className="mt-5 w-full">Ver QR</FlexButton></Link>
@@ -101,7 +102,7 @@ export default function UserDashboard() {
 
       <section className="content-auto soft-enter soft-enter-delay-3 order-2 min-w-0 space-y-4 2xl:order-3 2xl:col-start-1">
         <div className="flex items-center justify-between gap-4">
-          <h2 className="text-sm font-bold uppercase tracking-[0.08em] text-white">Próximos eventos</h2>
+          <h2 className="text-sm font-bold uppercase tracking-[0.08em] text-white">Proximos eventos</h2>
           <Link href="/app/events" prefetch={false} className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--gold)]">Ver todos</Link>
         </div>
         <HomeUpcomingEvents />

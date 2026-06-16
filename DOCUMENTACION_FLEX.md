@@ -7690,3 +7690,41 @@ Stripe CLI puede enviar eventos auxiliares como `payment_intent.created`, `payme
 
 - Revisar si se quiere una pantalla dedicada de reservas VIP activas.
 - Considerar una proteccion transaccional en base de datos si se espera alta concurrencia de eventos duplicados simultaneos.
+
+---
+
+## Fase Productos
+
+### Que se cambio
+
+- Se agrego la seccion `/app/products` con catalogo, carrito persistente y flujo de checkout preparado para Stripe.
+- Se amplio el catalogo a un conjunto mas realista de productos de discoteca con botellas, refrescos, energéticas, cachimbas, merch, reservas y packs.
+- Se agruparon los productos por categorias con chips de navegacion y se priorizaron los destacados dentro del catalogo.
+- Se creo `lib/products/service.ts` como capa de acceso a datos para Supabase con `getProducts()`, `getActiveProducts()`, `getProductsByCategory()` y `getFeaturedProducts()`.
+- Se creo la migracion `supabase/migrations/20260616120000_products_catalog.sql` con la tabla `products`, indices, RLS y policies.
+- Se extendio `supabase/seed.sql` con el seed inicial de productos para que `supabase db reset` regenere el catalogo.
+- Se actualizo `lib/products/cart-store.ts` para seguir deduplicando y persistiendo el carrito sin depender del catalogo mock local.
+- Se actualizo `lib/products/checkout.ts` para validar el carrito contra productos reales de Supabase antes de preparar el checkout.
+- Se actualizo `app/app/products/page.tsx` para cargar el catalogo desde Supabase y mantener la misma experiencia visual.
+- Se endurecio la capa de productos para ignorar filas invalidas, tolerar productos sin imagen o categoria y limpiar automaticamente productos huérfanos del carrito.
+- Se actualizo la navegacion de usuario y la cabecera de `UserAppShell` para exponer Productos.
+- Se ajusto la navegacion inferior para que Productos aparezca en el menu movil sin crear un navbar nuevo.
+- Se agrego acceso rapido a Productos en la home de `/app`.
+- Se simplifico la vista de compra para dejar solo la informacion necesaria.
+- Se reemplazo el carrito fijo inferior por un boton flotante con drawer lateral responsive.
+- Se simplifico el acceso al carrito para mostrar solo icono, badge y subtotal, reduciendo texto redundante.
+- Se mejoro el contraste y jerarquia visual del boton flotante del carrito con efecto glass suave, borde dorado y sombra.
+
+### Como probar
+
+1. Ejecutar `npm run dev`.
+2. Abrir `/app/products`.
+3. Agregar varios productos al carrito, subir y bajar cantidades y eliminar lineas.
+4. Recargar la pagina y confirmar que el carrito se restaura.
+5. Pulsar `Continuar al checkout` y verificar que vuelve a `/app/products?checkout=success...`.
+6. Confirmar que el carrito se vacia tras el flujo de exito.
+
+### Pendiente
+
+- Conectar `createCheckoutSession(cart)` con un checkout real de Stripe.
+- Definir persistencia en base de datos si el carrito debe sobrevivir entre dispositivos.

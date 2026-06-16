@@ -1,4 +1,4 @@
-import { Bell, CalendarDays, Crown, History, LineChart, Megaphone, Mic2, Music, QrCode, Shirt, Ticket, Users } from "lucide-react";
+import { Bell, CalendarDays, Crown, History, LineChart, Megaphone, Mic2, Music, QrCode, Shirt, ShoppingBag, Ticket, Users } from "lucide-react";
 import type { Metric, NavItem } from "./types";
 
 export const userNav: NavItem[] = [
@@ -6,6 +6,7 @@ export const userNav: NavItem[] = [
   { href: "/app/today", label: "Hoy", icon: Megaphone },
   { href: "/app/song-request", label: "Canción", icon: Music },
   { href: "/app/my-turn", label: "Mi turno", icon: Mic2 },
+  { href: "/app/products", label: "Productos", icon: ShoppingBag },
   { href: "/app/tickets", label: "Entradas", icon: QrCode },
   { href: "/app/vip", label: "VIP", icon: Crown },
   { href: "/app/profile", label: "Perfil", icon: Users },

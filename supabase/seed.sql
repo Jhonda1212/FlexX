@@ -398,6 +398,93 @@ set
   image_url = coalesce(public.daily_feed_posts.image_url, excluded.image_url);
 
 -- ---------------------------------------------------------------------------
+-- Products
+-- ---------------------------------------------------------------------------
+
+with seed_products (
+  id,
+  name,
+  description,
+  price,
+  image,
+  category,
+  active,
+  featured
+) as (
+  values
+    ('55555555-5555-4555-8555-555555555501'::uuid, 'Mesa VIP 2', 'Reservado intimo para dos.', 40.00, null::text, 'Reservados VIP', true, true),
+    ('55555555-5555-4555-8555-555555555502'::uuid, 'Mesa VIP 4', 'Mesa privada para grupos pequenos.', 70.00, null::text, 'Reservados VIP', true, true),
+    ('55555555-5555-4555-8555-555555555503'::uuid, 'Lounge VIP', 'Espacio premium con prioridad de servicio.', 110.00, null::text, 'Reservados VIP', true, true),
+    ('55555555-5555-4555-8555-555555555504'::uuid, 'Pulsera VIP', 'Acceso especial para invitados.', 10.00, null::text, 'Reservados VIP', true, false),
+    ('55555555-5555-4555-8555-555555555505'::uuid, 'Champagne L''UIX', 'Botella de celebracion.', 38.00, null::text, 'Champagnes', true, true),
+    ('55555555-5555-4555-8555-555555555506'::uuid, 'Moet & Chandon', 'Clasico premium de celebracion.', 95.00, null::text, 'Champagnes', true, true),
+    ('55555555-5555-4555-8555-555555555507'::uuid, 'Veuve Clicquot', 'Champagne premium de referencia.', 110.00, null::text, 'Champagnes', true, false),
+    ('55555555-5555-4555-8555-555555555508'::uuid, 'Dom Perignon', 'Champagne iconico para noches grandes.', 180.00, null::text, 'Champagnes', true, true),
+    ('55555555-5555-4555-8555-555555555509'::uuid, 'Vodka Standard', 'Servicio base para la mesa.', 12.00, null::text, 'Botellas Estándar', true, false),
+    ('55555555-5555-4555-8555-555555555510'::uuid, 'Gin Standard', 'Gin con mixer clasico.', 13.00, null::text, 'Botellas Estándar', true, false),
+    ('55555555-5555-4555-8555-555555555511'::uuid, 'Ron Standard', 'Ron listo para copas.', 11.00, null::text, 'Botellas Estándar', true, false),
+    ('55555555-5555-4555-8555-555555555512'::uuid, 'Tequila Standard', 'Tequila para brindis.', 14.00, null::text, 'Botellas Estándar', true, false),
+    ('55555555-5555-4555-8555-555555555513'::uuid, 'Vodka Premium', 'Botella premium para mesa.', 22.00, null::text, 'Botellas Premium', true, true),
+    ('55555555-5555-4555-8555-555555555514'::uuid, 'Gin Premium', 'Gin premium para compartir.', 24.00, null::text, 'Botellas Premium', true, true),
+    ('55555555-5555-4555-8555-555555555515'::uuid, 'Whisky Premium', 'Whisky de gama alta.', 28.00, null::text, 'Botellas Premium', true, true),
+    ('55555555-5555-4555-8555-555555555516'::uuid, 'Tequila Premium', 'Tequila premium para noche larga.', 26.00, null::text, 'Botellas Premium', true, false),
+    ('55555555-5555-4555-8555-555555555517'::uuid, 'Vodka Red Bull', 'Cocktail de energia.', 10.00, null::text, 'Cocktails', true, true),
+    ('55555555-5555-4555-8555-555555555518'::uuid, 'Mojito', 'Cocktail fresco de barra.', 9.00, null::text, 'Cocktails', true, false),
+    ('55555555-5555-4555-8555-555555555519'::uuid, 'Aperol Spritz', 'Cocktail ligero y visual.', 11.00, null::text, 'Cocktails', true, true),
+    ('55555555-5555-4555-8555-555555555520'::uuid, 'Mojito Passion', 'Version tropical de la casa.', 10.00, null::text, 'Cocktails', true, false),
+    ('55555555-5555-4555-8555-555555555521'::uuid, 'Coca-Cola', 'Refresco clasico.', 3.00, null::text, 'Refrescos y Energéticas', true, false),
+    ('55555555-5555-4555-8555-555555555522'::uuid, 'Nestea', 'Refresco frio y ligero.', 3.00, null::text, 'Refrescos y Energéticas', true, false),
+    ('55555555-5555-4555-8555-555555555523'::uuid, 'Agua mineral', 'Agua fria embotellada.', 2.00, null::text, 'Refrescos y Energéticas', true, false),
+    ('55555555-5555-4555-8555-555555555524'::uuid, 'Tonica', 'Mixer para copas.', 3.00, null::text, 'Refrescos y Energéticas', true, false),
+    ('55555555-5555-4555-8555-555555555525'::uuid, 'Red Bull', 'Energetica clasica.', 4.00, null::text, 'Refrescos y Energéticas', true, true),
+    ('55555555-5555-4555-8555-555555555526'::uuid, 'Monster', 'Energetica para aguantar la noche.', 4.00, null::text, 'Refrescos y Energéticas', true, false),
+    ('55555555-5555-4555-8555-555555555527'::uuid, 'Cachimba Fruta', 'Cachimba con mezcla frutal.', 18.00, null::text, 'Cachimbas / Shishas', true, true),
+    ('55555555-5555-4555-8555-555555555528'::uuid, 'Cachimba Menta', 'Sabor fresco y suave.', 18.00, null::text, 'Cachimbas / Shishas', true, false),
+    ('55555555-5555-4555-8555-555555555529'::uuid, 'Cachimba Premium', 'Preparacion premium de cachimba.', 24.00, null::text, 'Cachimbas / Shishas', true, true),
+    ('55555555-5555-4555-8555-555555555530'::uuid, 'Pack Duo', '2 bebidas y 1 snack.', 16.00, null::text, 'Packs y Promociones', true, true),
+    ('55555555-5555-4555-8555-555555555531'::uuid, 'Pack Night', '2 copas y 2 refrescos.', 20.00, null::text, 'Packs y Promociones', true, true),
+    ('55555555-5555-4555-8555-555555555532'::uuid, 'Pack Premium', 'Botella premium y mixers.', 42.00, null::text, 'Packs y Promociones', true, false),
+    ('55555555-5555-4555-8555-555555555533'::uuid, 'Snack premium', 'Picoteo ligero para compartir.', 7.00, null::text, 'Packs y Promociones', true, false),
+    ('55555555-5555-4555-8555-555555555534'::uuid, 'Camiseta FLEX', 'Merch oficial de la discoteca.', 25.00, null::text, 'Merchandising', true, true),
+    ('55555555-5555-4555-8555-555555555535'::uuid, 'Gorra FLEX', 'Gorra negra con logo.', 18.00, null::text, 'Merchandising', true, false),
+    ('55555555-5555-4555-8555-555555555536'::uuid, 'Tote bag FLEX', 'Bolsa textil para llevarlo todo.', 15.00, null::text, 'Merchandising', true, false)
+)
+insert into public.products (
+  id,
+  name,
+  description,
+  price,
+  image,
+  category,
+  active,
+  featured
+)
+select
+  seed_products.id,
+  seed_products.name,
+  seed_products.description,
+  seed_products.price,
+  seed_products.image,
+  seed_products.category,
+  seed_products.active,
+  seed_products.featured
+from seed_products
+where not exists (
+  select 1
+  from public.products as product
+  where product.id = seed_products.id
+)
+on conflict (id) do update
+set
+  name = excluded.name,
+  description = excluded.description,
+  price = excluded.price,
+  image = excluded.image,
+  category = excluded.category,
+  active = excluded.active,
+  featured = excluded.featured;
+
+-- ---------------------------------------------------------------------------
 -- Local admin note
 -- ---------------------------------------------------------------------------
 -- Auth users are intentionally not seeded here. For local development:

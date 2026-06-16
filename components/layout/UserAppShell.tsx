@@ -20,6 +20,10 @@ const userRouteHeaders = {
     title: "Salas VIP",
     subtitle: "Reserva un espacio privado para compartir la noche con tu grupo."
   },
+  "/app/products": {
+    title: "Productos",
+    subtitle: "Catalogo de barra y merch con carrito persistente y checkout preparado."
+  },
   "/app/my-turn": {
     title: "Mi turno en vivo",
     subtitle: "Apuntate para cantar, tocar o subir al escenario esta noche."
