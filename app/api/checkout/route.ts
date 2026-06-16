@@ -22,6 +22,12 @@ type CheckoutProduct = {
   currency: string;
 };
 
+function stripeMetadata(metadata: Record<string, string | null>) {
+  return Object.fromEntries(
+    Object.entries(metadata).filter((entry): entry is [string, string] => typeof entry[1] === "string" && entry[1].length > 0)
+  );
+}
+
 const isDev = process.env.NODE_ENV !== "production";
 
 type CheckoutDebugData = Record<string, unknown>;
@@ -320,7 +326,10 @@ export async function POST(request: Request) {
         currency,
         customer_email: user.email ?? null,
         metadata: {
-          checkout_item_type: itemType
+          checkout_item_type: itemType,
+          event_id: product.eventId,
+          zone_id: product.zoneId,
+          ticket_tier_id: product.ticketTierId
         }
       })
       .select("id")
@@ -353,7 +362,10 @@ export async function POST(request: Request) {
     logCheckoutDebug("order_items insert result", {
       order_id: order.id,
       item_error: itemError?.message ?? null,
-      item_type: product.orderItemType
+      item_type: product.orderItemType,
+      event_id: product.eventId,
+      zone_id: product.zoneId,
+      ticket_tier_id: product.ticketTierId
     });
 
     if (itemError) throw itemError;
@@ -381,11 +393,14 @@ export async function POST(request: Request) {
             }
           }
         ],
-        metadata: {
+        metadata: stripeMetadata({
           order_id: order.id,
           user_id: user.id,
-          item_type: itemType
-        },
+          item_type: itemType,
+          event_id: product.eventId,
+          zone_id: product.zoneId,
+          ticket_tier_id: product.ticketTierId
+        }),
         success_url: `${baseUrl}/app/tickets?checkout=success&item_type=${itemType}&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${baseUrl}/app/tickets?checkout=cancelled`
       });

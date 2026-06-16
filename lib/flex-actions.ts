@@ -91,8 +91,21 @@ export type VipRoom = {
 export type TicketView = {
   id: string;
   eventName: string;
+  tierName: string | null;
+  startsAt: string | null;
   qrToken: string;
   status: "valid" | "used" | "expired" | "cancelled";
+  createdAt: string;
+};
+
+export type VipAccessView = {
+  id: string;
+  roomName: string;
+  eventName: string | null;
+  startsAt: string | null;
+  qrToken: string;
+  status: "confirmed" | "active" | "inactive" | "expired" | "cancelled" | "pending";
+  maxGuests: number;
   createdAt: string;
 };
 
@@ -364,6 +377,8 @@ export async function listUserTickets(): Promise<TicketView[]> {
     return ensureDemoTickets().map((ticket: MockTicket) => ({
       id: ticket.id,
       eventName: ticket.eventName,
+      tierName: null,
+      startsAt: null,
       qrToken: ticket.qrToken,
       status: ticket.status === "valid" ? "valid" : ticket.status,
       createdAt: ticket.createdAt
@@ -375,20 +390,55 @@ export async function listUserTickets(): Promise<TicketView[]> {
 
   const { data, error } = await supabase
     .from("tickets")
-    .select("id, qr_token, status, created_at, events(title)")
+    .select("id, qr_token, status, created_at, events(title, starts_at), event_ticket_tiers(name, zone_name)")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
 
   return (data ?? []).map((ticket) => {
-    const eventData = ticket.events as { title?: string } | null;
+    const eventData = ticket.events as { title?: string; starts_at?: string | null } | null;
+    const tierData = ticket.event_ticket_tiers as { name?: string | null; zone_name?: string | null } | null;
     return {
       id: ticket.id as string,
       eventName: eventData?.title ?? "Entrada FLEX",
+      tierName: tierData?.name ?? tierData?.zone_name ?? null,
+      startsAt: eventData?.starts_at ?? null,
       qrToken: ticket.qr_token as string,
       status: mapTicketStatus(ticket.status as string),
       createdAt: ticket.created_at as string
+    };
+  });
+}
+
+export async function listUserVipAccesses(): Promise<VipAccessView[]> {
+  if (mocksEnabled()) return [];
+
+  const { supabase, userId } = await getSupabaseUserId();
+  if (!userId) throw new Error("Debes iniciar sesion para ver tus accesos VIP.");
+
+  const { data, error } = await supabase
+    .from("private_room_access")
+    .select("id, qr_token, active, status, max_guests, created_at, expires_at, club_zones(name), events(title, starts_at)")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  return (data ?? []).map((access) => {
+    const zoneData = access.club_zones as { name?: string | null } | null;
+    const eventData = access.events as { title?: string | null; starts_at?: string | null } | null;
+    const status = (access.status as VipAccessView["status"] | null) ?? (access.active ? "confirmed" : "inactive");
+
+    return {
+      id: access.id as string,
+      roomName: zoneData?.name ?? "Sala VIP",
+      eventName: eventData?.title ?? null,
+      startsAt: eventData?.starts_at ?? null,
+      qrToken: access.qr_token as string,
+      status,
+      maxGuests: access.max_guests as number,
+      createdAt: access.created_at as string
     };
   });
 }

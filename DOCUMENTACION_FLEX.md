@@ -8135,6 +8135,238 @@ npm run dev
 
 Despues de aplicar, un usuario normal autenticado podra consultar su ausencia de rol sin error y seguira sin poder insertarse o actualizarse en `staff_profiles`.
 
+## Fase actual: post-pago Stripe y accesos QR en `/app/tickets` - 2026-06-16
+
+### Principio de seguridad
+
+`checkout=success` en la URL no confirma el pago. Solo indica que Stripe redirigio al usuario de vuelta a la app. La fuente de verdad es el webhook `checkout.session.completed`, validado con `STRIPE_WEBHOOK_SECRET`.
+
+### Cambios de base de datos
+
+Se agrego la migracion:
+
+- `supabase/migrations/20260616130000_complete_checkout_fulfillment_fields.sql`
+
+La migracion completa campos de fulfillment:
+
+- `tickets.ticket_tier_id uuid references public.event_ticket_tiers(id)`
+- `private_room_access.status text default 'confirmed'`
+- constraint para estados VIP: `pending`, `confirmed`, `active`, `inactive`, `expired`, `cancelled`
+- indices para `tickets.ticket_tier_id` y `private_room_access.status`
+
+Los tokens QR ya existian:
+
+- `tickets.qr_token text unique default public.secure_token()`
+- `private_room_access.qr_token text unique default public.secure_token()`
+
+### Webhook Stripe
+
+`app/api/stripe/webhook/route.ts` mantiene el flujo seguro:
+
+- valida firma Stripe con raw body y `STRIPE_WEBHOOK_SECRET`
+- busca la orden por `stripe_checkout_session_id`, `metadata.order_id` o `client_reference_id`
+- valida importe y divisa contra la orden
+- marca `orders.status = paid` y `paid_at` solo desde webhook
+- no confia en precios enviados desde frontend
+- mantiene idempotencia revisando si ya existen `tickets` o `private_room_access` para el `order_id`
+
+Fulfillment:
+
+- `ticket`
+  - crea tickets segun `quantity`
+  - asocia `user_id`, `order_id`, `event_id`, `zone_id`, `ticket_tier_id`
+  - cada ticket recibe `qr_token` unico por default SQL
+- `vip_reservation`
+  - crea `private_room_access`
+  - asocia `user_id`, `order_id`, `event_id`, `zone_id`
+  - marca `active = true` y `status = confirmed`
+  - usa `max_guests` desde capacidad de sala, limitado a 10
+  - recibe `qr_token` unico por default SQL
+
+Eventos secundarios como `payment_intent.created`, `payment_intent.succeeded` y `charge.updated` se ignoran con HTTP 200 si no requieren accion operativa.
+
+### `/app/tickets`
+
+La pagina ahora muestra:
+
+- entradas normales del usuario
+- reservas/accesos VIP confirmados del usuario
+- QR visual con `qrcode.react`
+- tipo de acceso: `Entrada` o `VIP`
+- evento o sala
+- fecha/hora si existe
+- codigo de acceso
+- estado
+
+Valores QR:
+
+- entrada: `FLEX:TICKET:<ticket_id>:<qr_token>`
+- VIP: `FLEX:VIP:<access_id>:<qr_token>`
+
+El QR no contiene secretos, service role ni datos privados sensibles.
+
+### Estado post-checkout
+
+Cuando la URL trae `checkout=success&session_id=...`, `/app/tickets`:
+
+- muestra `Estamos confirmando tu pago con Stripe. Esto puede tardar unos segundos.`
+- consulta `orders`, `tickets` y `private_room_access`
+- hace polling cada 3 segundos por tiempo limitado
+- muestra boton `Actualizar estado`
+- cuando el webhook crea fulfillment, cambia a:
+  - `Pago confirmado. Tus entradas ya estan activas.`
+  - o `Reserva VIP confirmada. Tu acceso privado ya esta activo.`
+
+### Compartir
+
+Se agregaron acciones en cada acceso:
+
+- `Copiar codigo`
+- `Compartir por WhatsApp`
+
+WhatsApp abre `wa.me` con mensaje prellenado. No envia nada automaticamente.
+
+### Como probar localmente
+
+1. Levantar Supabase local y aplicar migraciones:
+   ```bash
+   npx supabase start
+   npx supabase migration up --local
+   ```
+2. Configurar `.env.local` con Supabase local y Stripe test.
+3. Levantar Next:
+   ```bash
+   npm run dev
+   ```
+4. En otra terminal:
+   ```bash
+   stripe listen --forward-to localhost:3000/api/stripe/webhook
+   ```
+5. Copiar el `whsec_...` a `STRIPE_WEBHOOK_SECRET` y reiniciar `npm run dev`.
+6. Iniciar checkout VIP o entrada.
+7. Pagar con:
+   ```text
+   4242 4242 4242 4242
+   ```
+8. Volver a `/app/tickets`.
+9. Confirmar que aparece el acceso con QR cuando el webhook termina.
+
+### Como revisar en Supabase
+
+- Orden:
+  ```sql
+  select id, status, paid_at, stripe_checkout_session_id
+  from public.orders
+  order by created_at desc;
+  ```
+- Tickets:
+  ```sql
+  select id, user_id, order_id, event_id, ticket_tier_id, qr_token, status
+  from public.tickets
+  order by created_at desc;
+  ```
+- VIP:
+  ```sql
+  select id, user_id, order_id, zone_id, qr_token, active, status, max_guests
+  from public.private_room_access
+  order by created_at desc;
+  ```
+
+### Idempotencia
+
+Si Stripe reintenta el mismo `checkout.session.completed`, el webhook revisa fulfillment existente por `order_id` y no duplica tickets ni accesos VIP.
+
+### Pendiente
+
+- Email automatico de confirmacion.
+- Envio automatico por WhatsApp.
+- Descarga del QR como imagen.
+- Reservas por fecha/franja si se agrega una tabla especifica de disponibilidad de salas.
+
+## Correccion de logging y fulfillment del webhook Stripe - 2026-06-16
+
+### Problema
+
+`checkout.session.completed` podia fallar durante fulfillment y el log mostraba `error: { message: '[object Object]' }`, ocultando el error real de Supabase/PostgREST. Esto impedia saber si fallaba la actualizacion de `orders`, la lectura de `order_items` o el insert en `tickets`/`private_room_access`.
+
+### Cambios realizados
+
+- `app/api/stripe/webhook/route.ts`
+  - Se agrego serializacion segura de errores con `message`, `details`, `hint`, `code` y `status`.
+  - Se agregaron logs seguros antes y despues de:
+    - buscar orden por session id
+    - buscar orden por metadata/client reference
+    - actualizar `orders` a `paid`
+    - revisar fulfillment existente
+    - procesar cada `order_item`
+    - insertar `tickets`
+    - consultar `club_zones`
+    - insertar `private_room_access`
+  - Se agrego log especifico `checkout fulfillment failed` con `order_id`, `user_id` y cantidad de items.
+  - El insert VIP usa `private_room_access.status = confirmed` y, si PostgREST aun no ve la columna por schema cache, reintenta sin `status` para usar el default SQL `confirmed`.
+
+### Verificacion de schema local
+
+`private_room_access` tiene:
+
+- `id`
+- `user_id`
+- `event_id`
+- `zone_id`
+- `order_id`
+- `qr_token`
+- `active`
+- `max_guests`
+- `expires_at`
+- `created_at`
+- `updated_at`
+- `status`
+
+`tickets` tiene:
+
+- `id`
+- `user_id`
+- `event_id`
+- `order_id`
+- `qr_token`
+- `status`
+- `expires_at`
+- `used_at`
+- `created_at`
+- `updated_at`
+- `zone_id`
+- `ticket_tier_id`
+
+### Ajuste adicional de `zone_id` para VIP
+
+Se reforzo el flujo para que una reserva VIP conserve `zone_id` en tres lugares:
+
+- `order_items.zone_id`
+- `orders.metadata.zone_id`
+- `Stripe Checkout Session metadata.zone_id`
+
+El webhook resuelve `zone_id` desde `order_items` y usa metadata como fallback. Si no encuentra `zone_id`, registra `VIP fulfillment missing zone_id for order` junto con los `order_items` encontrados, metadata de orden y metadata de Stripe.
+
+Tambien se agrego retry de lectura sin `ticket_tier_id` si PostgREST devuelve error de schema cache para esa columna, y retry del insert VIP sin `status` si el schema cache aun no ve la columna. En schema actualizado, el insert usa columnas reales y `status = confirmed`.
+
+### Diagnostico de `checkout.session.completed`
+
+Para diagnosticar fallos 500 del webhook en local, `app/api/stripe/webhook/route.ts` imprime logs seguros con prefijo `[stripe-webhook]` en la terminal donde corre `npm run dev`.
+
+Los logs no muestran secretos. Solo indican si existen variables como `SUPABASE_SERVICE_ROLE_KEY` y `STRIPE_WEBHOOK_SECRET`, y muestran IDs operativos, metadata de Stripe, orden encontrada, `order_items`, payload de `private_room_access` y errores de Supabase serializados con `message`, `code`, `details` y `hint`.
+
+En una prueba VIP, revisar especialmente:
+
+- `[stripe-webhook] checkout.session.completed start`
+- `[stripe-webhook] checkout.session.completed order loaded`
+- `[stripe-webhook] checkout fulfillment item`
+- `[stripe-webhook] private room access payload`
+- `[stripe-webhook] private room access insert result`
+- `[stripe-webhook] checkout fulfillment failed`
+- `[stripe-webhook] event processing failed`
+
+Si el evento devuelve 500, copiar el bloque `checkout fulfillment failed` y el bloque `event processing failed`; ahi debe aparecer el error real de Supabase o el stack de JavaScript.
+
 ## Fase actual: webhook Stripe robusto e idempotente - 2026-06-15
 
 ### Contexto
