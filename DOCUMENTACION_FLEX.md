@@ -7701,6 +7701,359 @@ No era un problema de diseno ni de la pagina `/app/vip`. Los datos base VIP si e
 - Mantener Stripe CLI escuchando si se quiere completar el webhook local: `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
 - Reducir los logs de diagnostico cuando el flujo quede estable.
 
+## Fase actual: configuracion Supabase local versionada - 2026-06-16
+
+### Contexto
+
+Para que FLEX sea reproducible en varios computadores con Supabase local + Docker, el proyecto debe versionar `supabase/config.toml`. Este archivo define puertos, servicios locales, schemas expuestos, Auth, Storage, migraciones y seed. No contiene secretos reales.
+
+### Cambios realizados
+
+- Se creo `supabase/config.toml` con `npx.cmd supabase init`.
+- Se mantuvieron intactos `supabase/migrations` y `supabase/seed.sql`.
+- Se ajusto la configuracion local principal:
+  - API local habilitada en puerto `54321`.
+  - DB local en puerto `54322`.
+  - Studio local habilitado en puerto `54323`.
+  - Schemas expuestos: `public`, `storage`, `graphql_public`.
+  - Storage habilitado.
+  - Auth local habilitado.
+  - Seed local configurado con `./seed.sql`.
+- Se creo `supabase/.gitignore` para ignorar archivos locales de Supabase y env dentro de `supabase/`.
+- Se verifico que `.gitignore` raiz ignora `.env*.local` y mantiene `.env.example` versionable.
+
+### Flujo para configurar un PC nuevo
+
+1. Descargar cambios:
+   ```bash
+   git pull
+   ```
+2. Instalar dependencias:
+   ```bash
+   npm install
+   ```
+3. Levantar Supabase local con Docker:
+   ```bash
+   npx supabase start
+   ```
+4. Aplicar migraciones pendientes sin borrar datos:
+   ```bash
+   npx supabase migration up --local
+   ```
+5. Ver variables locales generadas por Supabase:
+   ```bash
+   npx supabase status
+   ```
+6. Copiar a `.env.local` los valores locales necesarios:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - variables Stripe locales o de test
+   - `NEXT_PUBLIC_APP_URL=http://localhost:3000`
+7. Ejecutar la app:
+   ```bash
+   npm run dev
+   ```
+
+### Recrear todo desde cero
+
+Cuando se quiera reconstruir la base local completa desde migraciones y seed:
+
+```bash
+npx supabase db reset
+```
+
+Advertencia: `db reset` borra datos locales, incluyendo usuarios en `auth.users`, `profiles`, `staff_profiles`, ordenes, tickets y datos creados manualmente. Solo debe usarse cuando se quiera recrear todo desde cero.
+
+### Que sigue siendo local
+
+- `.env.local` no se versiona y debe configurarse en cada PC.
+- `auth.users` no se sincroniza por Git.
+- Usuarios, sesiones, perfiles locales, ordenes, tickets y datos creados manualmente no viajan entre computadores.
+- Docker volumes locales conservan el estado de cada PC hasta que se haga `db reset` o se borren los volumenes.
+
+## Fase actual: recuperacion visual de `/app/vip` al volver de Stripe - 2026-06-16
+
+### Causa
+
+`/app/vip` es una pagina cliente. Al iniciar Checkout se marcaba `checkoutRoomId` para dejar el boton de la sala en estado `loading`. Cuando el navegador volvia desde Stripe con cache de historial, React podia restaurar ese estado local sin montar de nuevo la pagina, dejando una sala o el grid en apariencia de carga hasta refrescar o navegar.
+
+### Cambios realizados
+
+- `app/app/vip/page.tsx`
+  - Se separo la carga inicial de salas del refresco silencioso.
+  - Los skeletons se muestran solo cuando realmente no hay salas cargadas todavia.
+  - Al restaurar la pagina con `pageshow`, `popstate` o `focus`, se limpian `checkoutRoomId` y errores temporales de checkout.
+  - La pagina vuelve a consultar salas sin ocultar las cards ya disponibles.
+  - Se agrego banner para `checkout=success&item_type=vip`: `Reserva recibida. Estamos confirmando tu acceso VIP.`
+  - Se agrego banner para `checkout=cancel` o `checkout=cancelled`: `Reserva cancelada. Puedes intentarlo de nuevo.`
+
+### Como probar
+
+1. Abrir `/app/vip`.
+2. Confirmar que las salas VIP aparecen normalmente.
+3. Iniciar Checkout desde una sala.
+4. Cancelar en Stripe y volver.
+5. Confirmar que aparece el mensaje de cancelacion si la URL trae `checkout=cancel` o `checkout=cancelled`, y que las cards siguen visibles.
+6. Completar pago y volver.
+7. Confirmar que aparece el mensaje de reserva recibida si la URL trae `checkout=success&item_type=vip`, y que las cards siguen visibles.
+8. Usar atras/adelante del navegador y confirmar que no queda ningun boton o card en estado cargando.
+
+### Pendiente
+
+- Si se decide que el retorno natural de VIP debe ser `/app/vip` en vez de `/app/tickets`, ajustar las URLs de exito/cancelacion en `/api/checkout` de forma explicita. Esta fase no cambio el backend de Stripe.
+
+## Deploy a produccion con Vercel - 2026-06-16
+
+### Objetivo
+
+Preparar FLEX para desplegar produccion desde la rama `main` en Vercel usando Next.js, Supabase y Stripe Checkout/Webhooks, sin versionar secretos.
+
+### Flujo Git recomendado
+
+- `main`: rama estable de produccion. Vercel Production debe desplegar desde esta rama.
+- `jhonda` y ramas de colaboradores: desarrollo y pruebas.
+- Todo cambio hacia produccion debe entrar por PR hacia `main`.
+- Antes de mergear a `main` ejecutar:
+  ```bash
+  git status
+  npm run lint
+  npm run build
+  ```
+
+### Supabase
+
+- `supabase/config.toml` esta versionado para desarrollo local con Docker.
+- No contiene secretos reales.
+- Configuracion local principal:
+  - API: `54321`
+  - DB: `54322`
+  - Studio: `54323`
+  - schemas: `public`, `storage`, `graphql_public`
+  - Storage habilitado
+  - Auth habilitado
+  - seed local configurado con `./seed.sql`
+- No ejecutar `npx supabase db reset` en produccion.
+- Para produccion aplicar migraciones al proyecto Supabase remoto con el flujo oficial del equipo. No usar seed demo automaticamente en produccion.
+
+### Migraciones verificadas
+
+Las migraciones cubren:
+
+- `profiles`
+- `staff_profiles`
+- `club_zones`
+- `events`
+- `event_ticket_tiers`
+- `daily_feed_posts`
+- buckets de Storage: `flex-assets`, `event-images`, `feed-images`
+- `orders`
+- `order_items`
+- `tickets`
+- `private_room_access`
+- `private_room_guests`
+- columnas Stripe:
+  - `orders.stripe_customer_id`
+  - `orders.customer_email`
+  - `orders.paid_at`
+  - `order_items.ticket_tier_id`
+  - `order_items.total_amount_cents`
+  - `tickets.zone_id`
+
+### Seed y datos demo
+
+`supabase/seed.sql` mezcla datos base locales con datos demo opcionales:
+
+- base: zonas del club, incluyendo salas VIP privadas
+- demo: eventos, tiers de entradas y publicaciones de Hoy en FLEX
+
+Para produccion, no ejecutar seed sin revisar el contenido. Crear eventos, tiers, posts y staff desde el panel admin o mediante scripts revisados para produccion. El seed queda pensado para setup local reproducible.
+
+### RLS y seguridad
+
+- `daily_feed_posts` tiene lectura de publicados para usuarios autenticados y lectura completa para staff.
+- La migracion `20260615100000_harden_daily_feed_posts_admin_rls.sql` elimina permisos de escritura generales de staff y deja insert/update/delete solo a `admin`.
+- `SUPABASE_SERVICE_ROLE_KEY` solo debe existir en entornos servidor:
+  - Vercel Environment Variables
+  - `.env.local` local
+  - nunca en componentes cliente
+  - nunca como `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY`
+- `.env.local` esta ignorado por Git.
+
+### Stripe Checkout
+
+`/api/checkout`:
+
+- valida usuario autenticado con Supabase Auth
+- resuelve producto real en servidor
+- calcula precios desde Supabase, no desde el frontend
+- crea `orders.status = pending`
+- crea `order_items`
+- crea Stripe Checkout Session
+- usa `NEXT_PUBLIC_APP_URL` para success/cancel URLs mediante el helper de URL base
+
+`/api/stripe/webhook`:
+
+- lee raw body
+- valida firma con `STRIPE_WEBHOOK_SECRET`
+- procesa `checkout.session.completed`
+- valida importe y divisa contra la orden
+- marca la orden como `paid`
+- crea `tickets` para entradas normales
+- crea `private_room_access` para VIP
+- comprueba fulfillment existente para no duplicar tickets/accesos
+- ignora eventos secundarios con HTTP 200
+
+En produccion no se usa `stripe listen`; Stripe debe llamar directamente al dominio real.
+
+### Variables de entorno
+
+Configurar en Vercel Production:
+
+- `NEXT_PUBLIC_SUPABASE_URL`: URL del proyecto Supabase de produccion.
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: publishable key de produccion.
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: solo si se mantiene fallback o proyecto antiguo; preferir publishable key.
+- `SUPABASE_SERVICE_ROLE_KEY`: service role de produccion, server-only.
+- `STRIPE_SECRET_KEY`: secret key de Stripe en modo test o live segun fase.
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`: publishable key correspondiente.
+- `STRIPE_WEBHOOK_SECRET`: secreto del webhook real de Stripe para el endpoint de produccion.
+- `NEXT_PUBLIC_APP_URL`: dominio de produccion, por ejemplo `https://dominio.com`.
+
+Configurar en Vercel Preview:
+
+- Usar proyecto Supabase preview/staging si existe, o documentar explicitamente si Preview apunta a Supabase de test.
+- Usar claves Stripe test.
+- `NEXT_PUBLIC_APP_URL` debe ser la URL de preview estable si se usa una, o el dominio preview configurado para pruebas.
+- Crear webhook separado en Stripe para Preview si se probaran pagos preview.
+
+Variables locales:
+
+- salen de `npx supabase status`:
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+- Stripe local/test:
+  - `STRIPE_SECRET_KEY`
+  - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+  - `STRIPE_WEBHOOK_SECRET` generado por `stripe listen`
+- `NEXT_PUBLIC_APP_URL=http://localhost:3000`
+
+### Configurar Vercel
+
+1. Conectar Vercel con el repositorio de GitHub.
+2. Seleccionar el proyecto FLEX.
+3. Configurar Framework Preset: Next.js.
+4. Configurar Production Branch: `main`.
+5. Cargar variables en Project Settings -> Environment Variables.
+6. Separar valores Production y Preview.
+7. Hacer deploy desde `main`.
+
+### Configurar webhook real de Stripe
+
+1. En Stripe Dashboard, entrar al modo correcto: test primero, live despues.
+2. Crear endpoint:
+   ```text
+   https://dominio.com/api/stripe/webhook
+   ```
+3. Activar eventos:
+   - `checkout.session.completed`
+   - `payment_intent.created`
+   - `payment_intent.succeeded`
+   - `charge.updated`
+4. Copiar el signing secret `whsec_...`.
+5. Guardarlo en Vercel como `STRIPE_WEBHOOK_SECRET`.
+6. Redeploy si Vercel no recarga variables automaticamente para el runtime.
+
+### Probar Stripe en test mode
+
+1. Usar claves test de Stripe en Vercel.
+2. Usar tarjeta:
+   ```text
+   4242 4242 4242 4242
+   ```
+3. Completar Checkout.
+4. Verificar en Supabase:
+   - orden pasa de `pending` a `paid`
+   - tickets o acceso VIP se crean una sola vez
+5. Verificar logs de Vercel para `/api/stripe/webhook`.
+
+### Pasar a live mode
+
+1. Cambiar `STRIPE_SECRET_KEY` y `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` a claves live.
+2. Crear webhook live apuntando al dominio real.
+3. Guardar el `STRIPE_WEBHOOK_SECRET` live en Vercel Production.
+4. Verificar precios reales en Supabase antes de aceptar pagos.
+5. Hacer una prueba controlada de pago real.
+
+### Checklist antes de subir `main`
+
+- `git status` sin cambios no esperados.
+- `npm run lint` OK.
+- `npm run build` OK.
+- Migraciones revisadas y listas para Supabase remoto.
+- `.env.local` no trackeado.
+- `.env.example` solo placeholders.
+- Variables Production cargadas en Vercel.
+- Webhook Stripe creado y secret cargado.
+- `NEXT_PUBLIC_APP_URL` apunta al dominio real.
+- No ejecutar `db reset` en produccion.
+
+## Setup local en un computador nuevo - 2026-06-16
+
+### Flujo recomendado
+
+1. Descargar cambios:
+   ```bash
+   git pull
+   ```
+2. Instalar dependencias:
+   ```bash
+   npm install
+   ```
+3. Levantar Supabase local con Docker:
+   ```bash
+   npx supabase start
+   ```
+4. Aplicar migraciones pendientes sin borrar datos:
+   ```bash
+   npx supabase migration up --local
+   ```
+5. Solo si se quiere recrear la base local desde cero:
+   ```bash
+   npx supabase db reset
+   ```
+   Advertencia: esto borra usuarios locales en `auth.users`, `profiles`, `staff_profiles`, ordenes, tickets y datos creados manualmente.
+6. Ver claves locales:
+   ```bash
+   npx supabase status
+   ```
+7. Copiar a `.env.local`:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `NEXT_PUBLIC_APP_URL=http://localhost:3000`
+8. Configurar Stripe local/test:
+   ```bash
+   stripe listen --forward-to localhost:3000/api/stripe/webhook
+   ```
+9. Copiar el `whsec_...` local a `.env.local` como `STRIPE_WEBHOOK_SECRET`.
+10. Agregar claves Stripe test locales:
+   - `STRIPE_SECRET_KEY`
+   - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+11. Reiniciar Next despues de editar `.env.local`:
+   ```bash
+   npm run dev
+   ```
+
+### Que no se sincroniza por Git
+
+- `.env.local`
+- usuarios de Auth
+- sesiones
+- datos creados manualmente
+- volumenes Docker locales
+- webhooks Stripe locales
+
 ## Fase actual: webhook Stripe robusto e idempotente - 2026-06-15
 
 ### Contexto
