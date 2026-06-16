@@ -8054,6 +8054,87 @@ Variables locales:
 - volumenes Docker locales
 - webhooks Stripe locales
 
+## Correccion de permisos en `public.staff_profiles` - 2026-06-16
+
+### Causa exacta
+
+El error `permission denied for table staff_profiles` ocurre cuando un usuario autenticado intenta consultar su rol operativo y la base no tiene privilegios SQL suficientes sobre `public.staff_profiles`, aunque existan policies RLS. En Postgres se necesitan ambas capas:
+
+- `GRANT` sobre la tabla para el rol SQL (`authenticated`).
+- Policy RLS que limite que filas puede leer/escribir ese usuario.
+
+`staff_profiles` es sensible porque define roles `admin`, `guard`, `storage` y `dj`. La correccion no abre inserciones publicas ni permite que un usuario normal se haga staff/admin.
+
+### Schema revisado
+
+La tabla actual `public.staff_profiles` contiene:
+
+- `id uuid`
+- `user_id uuid`
+- `role public.staff_role`
+- `display_name text`
+- `active boolean`
+- `created_at timestamptz`
+- `updated_at timestamptz`
+
+No existe columna `profile_id` en el schema actual; `user_id` es la FK unica hacia `public.profiles(id)`.
+
+### Migracion creada
+
+- `supabase/migrations/20260616120000_harden_staff_profiles_rls.sql`
+
+La migracion:
+
+- mantiene RLS habilitado en `public.staff_profiles`
+- recrea `current_staff_role()`, `is_staff()` e `is_admin()` como `SECURITY DEFINER` con `search_path = public, pg_temp`
+- revoca todos los permisos de `anon`
+- concede a `authenticated` privilegios SQL necesarios para que RLS pueda evaluar lectura/escritura
+- deja `service_role` con acceso total server-side
+- reemplaza policies antiguas por policies explicitas
+
+### Policies finales
+
+- `staff_profiles read own`
+  - `SELECT`
+  - `to authenticated`
+  - `using (user_id = auth.uid())`
+- `staff_profiles admin read`
+  - `SELECT`
+  - `to authenticated`
+  - `using (public.is_admin())`
+- `staff_profiles admin insert`
+  - `INSERT`
+  - `to authenticated`
+  - `with check (public.is_admin())`
+- `staff_profiles admin update`
+  - `UPDATE`
+  - `to authenticated`
+  - `using (public.is_admin())`
+  - `with check (public.is_admin())`
+- `staff_profiles admin delete`
+  - `DELETE`
+  - `to authenticated`
+  - `using (public.is_admin())`
+
+### Codigo revisado
+
+- Login consulta `staff_profiles` solo para resolver rol y si no hay fila debe tratar el rol como `null`.
+- Middleware/proxy consulta rol para rutas staff/admin y debe tratar fila vacia como usuario normal.
+- AppShell/RoleGate consultan rol activo y bloquean zonas staff si no hay rol.
+- Registro normal crea usuario Auth y `profiles` mediante trigger; no crea `staff_profiles`.
+- Creacion/edicion de staff queda en acciones admin/server y policies admin.
+- No se usa `SUPABASE_SERVICE_ROLE_KEY` en componentes cliente.
+
+### Como aplicar el fix en otro PC
+
+```bash
+git pull
+npx supabase migration up --local
+npm run dev
+```
+
+Despues de aplicar, un usuario normal autenticado podra consultar su ausencia de rol sin error y seguira sin poder insertarse o actualizarse en `staff_profiles`.
+
 ## Fase actual: webhook Stripe robusto e idempotente - 2026-06-15
 
 ### Contexto
