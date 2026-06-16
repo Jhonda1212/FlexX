@@ -484,6 +484,127 @@ set
   active = excluded.active,
   featured = excluded.featured;
 
+-- Legacy product rows from the previous flat catalog are kept for history but
+-- disabled so the local demo catalog is deterministic.
+update public.products
+set active = false
+where id::text like '55555555-5555-4555-8555-5555555555%';
+
+with seed_categories (
+  id,
+  name,
+  description,
+  slug,
+  sort_order,
+  active
+) as (
+  values
+    ('66666666-6666-4666-8666-666666666001'::uuid, 'VIP', 'Reservas y experiencias privadas.', 'vip', 10, true),
+    ('66666666-6666-4666-8666-666666666002'::uuid, 'Premium', 'Botellas premium para mesa.', 'premium', 20, true),
+    ('66666666-6666-4666-8666-666666666003'::uuid, 'Champagnes', 'Champagnes y espumosos.', 'champagnes', 30, true),
+    ('66666666-6666-4666-8666-666666666004'::uuid, 'Estandar', 'Bebidas estandar de barra.', 'standard', 40, true),
+    ('66666666-6666-4666-8666-666666666005'::uuid, 'Cocktails', 'Cocktails de la casa.', 'cocktails', 50, true),
+    ('66666666-6666-4666-8666-666666666006'::uuid, 'Refrescos y Energeticas', 'Mixers, refrescos y energeticas.', 'refreshments', 60, true),
+    ('66666666-6666-4666-8666-666666666007'::uuid, 'Cachimbas', 'Cachimbas y sabores premium.', 'shishas', 70, true)
+)
+insert into public.product_categories (
+  id,
+  name,
+  description,
+  slug,
+  sort_order,
+  active
+)
+select
+  seed_categories.id,
+  seed_categories.name,
+  seed_categories.description,
+  seed_categories.slug,
+  seed_categories.sort_order,
+  seed_categories.active
+from seed_categories
+on conflict (slug) do update
+set
+  name = excluded.name,
+  description = excluded.description,
+  sort_order = excluded.sort_order,
+  active = excluded.active;
+
+with seed_products (
+  id,
+  category_slug,
+  name,
+  slug,
+  description,
+  price_cents,
+  currency,
+  image_url,
+  stock_quantity,
+  active,
+  featured,
+  tags
+) as (
+  values
+    ('77777777-7777-4777-8777-777777777001'::uuid, 'vip', 'Mesa VIP Oro', 'mesa-vip-oro', 'Reserva privada para grupos con atencion prioritaria.', 15000, 'eur', null::text, 6, true, true, array['vip','mesa']),
+    ('77777777-7777-4777-8777-777777777002'::uuid, 'champagnes', 'Botella Moet', 'botella-moet', 'Champagne Moet para celebraciones en mesa.', 9500, 'eur', null::text, 12, true, true, array['champagne']),
+    ('77777777-7777-4777-8777-777777777003'::uuid, 'premium', 'Botella Don Julio 70', 'botella-don-julio-70', 'Tequila premium para servicio de mesa.', 14000, 'eur', null::text, 8, true, true, array['tequila','premium']),
+    ('77777777-7777-4777-8777-777777777004'::uuid, 'standard', 'Cerveza Corona', 'cerveza-corona', 'Cerveza fria de barra.', 600, 'eur', null::text, 80, true, false, array['cerveza']),
+    ('77777777-7777-4777-8777-777777777005'::uuid, 'cocktails', 'Cocktail Margarita', 'cocktail-margarita', 'Margarita clasica preparada al momento.', 1200, 'eur', null::text, 40, true, true, array['cocktail']),
+    ('77777777-7777-4777-8777-777777777006'::uuid, 'refreshments', 'Red Bull', 'red-bull', 'Bebida energetica para acompanar copas.', 500, 'eur', null::text, 60, true, false, array['energetica']),
+    ('77777777-7777-4777-8777-777777777007'::uuid, 'shishas', 'Cachimba Premium', 'cachimba-premium', 'Cachimba premium con sabor a elegir.', 2500, 'eur', null::text, 10, true, true, array['cachimba'])
+)
+insert into public.products (
+  id,
+  category_id,
+  name,
+  slug,
+  description,
+  price,
+  price_cents,
+  currency,
+  image,
+  image_url,
+  category,
+  stock_quantity,
+  active,
+  featured,
+  tags
+)
+select
+  seed_products.id,
+  product_categories.id,
+  seed_products.name,
+  seed_products.slug,
+  seed_products.description,
+  seed_products.price_cents / 100.0,
+  seed_products.price_cents,
+  seed_products.currency,
+  seed_products.image_url,
+  seed_products.image_url,
+  product_categories.name,
+  seed_products.stock_quantity,
+  seed_products.active,
+  seed_products.featured,
+  seed_products.tags
+from seed_products
+join public.product_categories on product_categories.slug = seed_products.category_slug
+on conflict (id) do update
+set
+  category_id = excluded.category_id,
+  name = excluded.name,
+  slug = excluded.slug,
+  description = excluded.description,
+  price = excluded.price,
+  price_cents = excluded.price_cents,
+  currency = excluded.currency,
+  image = excluded.image,
+  image_url = excluded.image_url,
+  category = excluded.category,
+  stock_quantity = excluded.stock_quantity,
+  active = excluded.active,
+  featured = excluded.featured,
+  tags = excluded.tags;
+
 -- ---------------------------------------------------------------------------
 -- Local admin note
 -- ---------------------------------------------------------------------------

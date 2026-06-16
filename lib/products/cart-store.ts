@@ -117,7 +117,12 @@ export function calculateCartTotals(items: CartItem[]) {
       ...item,
       quantity: normalizeQuantity(item.quantity)
     }));
-  const subtotalCents = sanitizedItems.reduce((total, item) => total + Math.round(item.product.price * 100) * item.quantity, 0);
+  const subtotalCents = sanitizedItems.reduce((total, item) => {
+    const unitCents = typeof item.product.priceCents === "number"
+      ? item.product.priceCents
+      : Math.round(item.product.price * 100);
+    return total + unitCents * item.quantity;
+  }, 0);
   const totalQuantity = sanitizedItems.reduce((total, item) => total + item.quantity, 0);
 
   return {

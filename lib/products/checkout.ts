@@ -2,7 +2,7 @@ import type { CartItem } from "./types";
 import { createRouteSupabase } from "@/lib/supabase/route";
 import { getProducts } from "./service";
 
-export const stripePublicKey = process.env.STRIPE_PUBLIC_KEY ?? null;
+export const stripePublicKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? null;
 
 function appOrigin(requestUrl: string) {
   return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || new URL(requestUrl).origin;
@@ -15,7 +15,7 @@ function normalizeQuantity(quantity: number) {
   return quantity;
 }
 
-function normalizeCart(cart: CartItem[], productMap: Map<string, { price: number; active: boolean; name: string }>) {
+function normalizeCart(cart: CartItem[], productMap: Map<string, { price: number; priceCents: number; active: boolean; name: string; stockQuantity?: number | null }>) {
   if (!Array.isArray(cart) || cart.length === 0) {
     throw new Error("El carrito esta vacio.");
   }
@@ -47,10 +47,14 @@ function normalizeCart(cart: CartItem[], productMap: Map<string, { price: number
     }
 
     const quantity = normalizeQuantity(entry.quantity);
-    const unitAmountCents = Math.round(product.price * 100);
+    if (typeof product.stockQuantity === "number" && product.stockQuantity < quantity) {
+      throw new Error(`Stock insuficiente para ${product.name}.`);
+    }
+
+    const unitAmountCents = product.priceCents;
 
     return [{
-      product: { ...entry.product, name: product.name, price: product.price, active: product.active },
+      product: { ...entry.product, name: product.name, price: product.price, priceCents: product.priceCents, active: product.active },
       quantity,
       unitAmountCents,
       totalAmountCents: unitAmountCents * quantity

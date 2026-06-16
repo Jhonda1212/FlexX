@@ -6,64 +6,26 @@ import { AppPageHeader } from "@/components/app/AppPageHeader";
 import { FlexButton } from "@/components/ui/FlexButton";
 import { FlexCard } from "@/components/ui/FlexCard";
 import { calculateCartTotals, useProductCartStore } from "@/lib/products/cart-store";
+import { getProductCatalog } from "@/lib/products/service";
+import type { Product, ProductCategory } from "@/lib/products/types";
 import { createBrowserSupabase } from "@/lib/supabase";
-import { getActiveProducts } from "@/lib/products/service";
-import type { Product } from "@/lib/products/types";
-
-const currencyFormatter = new Intl.NumberFormat("es-ES", {
-  style: "currency",
-  currency: "EUR"
-});
-
-type CategoryKey = "vip" | "premium" | "champagnes" | "standard" | "cocktails" | "refreshments" | "shishas" | "packs" | "merch" | "all";
 
 type CategoryOption = {
-  key: CategoryKey;
+  key: string;
   label: string;
 };
 
-const categoryOrder: CategoryOption[] = [
-  { key: "vip", label: "VIP" },
-  { key: "premium", label: "Premium" },
-  { key: "champagnes", label: "Champagnes" },
-  { key: "standard", label: "Estándar" },
-  { key: "cocktails", label: "Cocktails" },
-  { key: "refreshments", label: "Refrescos y Energéticas" },
-  { key: "shishas", label: "Cachimbas" },
-  { key: "packs", label: "Packs" },
-  { key: "merch", label: "Merchandising" }
-];
+const allCategoryOption: CategoryOption = { key: "all", label: "Todo" };
 
-const categoryAliases: Record<string, CategoryKey> = {
-  "reservados vip": "vip",
-  "botellas premium": "premium",
-  champagnes: "champagnes",
-  "botellas estándar": "standard",
-  "botellas estandar": "standard",
-  cocktails: "cocktails",
-  "refrescos y energéticas": "refreshments",
-  "refrescos y energeticas": "refreshments",
-  "cachimbas / shishas": "shishas",
-  "packs y promociones": "packs",
-  merchandising: "merch"
-};
-
-function formatPrice(price: number) {
-  return currencyFormatter.format(price);
+function formatPrice(price: number, currency = "eur") {
+  return new Intl.NumberFormat("es-ES", {
+    style: "currency",
+    currency: currency.toUpperCase()
+  }).format(price);
 }
 
-function formatCents(cents: number) {
-  return currencyFormatter.format(cents / 100);
-}
-
-function getCategoryKey(category?: string) {
-  if (!category) return "packs";
-  return categoryAliases[category.trim().toLowerCase()] ?? "packs";
-}
-
-function categoryLabel(key: CategoryKey) {
-  if (key === "all") return "Todo";
-  return categoryOrder.find((option) => option.key === key)?.label ?? "Todo";
+function formatCents(cents: number, currency = "eur") {
+  return formatPrice(cents / 100, currency);
 }
 
 function sortProducts(products: Product[]) {
@@ -71,7 +33,16 @@ function sortProducts(products: Product[]) {
     if (Boolean(left.featured) !== Boolean(right.featured)) {
       return Number(right.featured) - Number(left.featured);
     }
-    return right.price - left.price;
+
+    if ((left.categorySortOrder ?? 0) !== (right.categorySortOrder ?? 0)) {
+      return (left.categorySortOrder ?? 0) - (right.categorySortOrder ?? 0);
+    }
+
+    if (left.priceCents !== right.priceCents) {
+      return right.priceCents - left.priceCents;
+    }
+
+    return left.name.localeCompare(right.name, "es");
   });
 }
 
@@ -86,6 +57,8 @@ function ProductCard({
   onQuantityChange: (nextQuantity: number) => void;
   onAdd: (product: Product, quantity: number) => void;
 }) {
+  const outOfStock = product.stockQuantity === 0;
+
   return (
     <FlexCard className="flex h-full flex-col border-white/10 bg-white/[0.03] p-4 sm:p-5">
       <div className="overflow-hidden rounded-lg border border-white/10 bg-[radial-gradient(circle_at_top,rgba(217,166,64,0.16),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.05),rgba(0,0,0,0.3))]">
@@ -115,40 +88,49 @@ function ProductCard({
                 Recomendado
               </span>
             ) : null}
+            {outOfStock ? (
+              <span className="rounded-full border border-red-500/25 bg-red-500/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-red-200">
+                Sin stock
+              </span>
+            ) : null}
           </div>
           <h2 className="mt-2 text-xl font-bold text-white">{product.name}</h2>
         </div>
-        <strong className="whitespace-nowrap text-[var(--gold-bright)]">{formatPrice(product.price)}</strong>
+        <strong className="whitespace-nowrap text-[var(--gold-bright)]">{formatPrice(product.price, product.currency)}</strong>
       </div>
 
       <p className="mt-3 text-sm leading-6 text-white/66">{product.description}</p>
 
-      <div className="mt-4 flex items-center justify-between gap-3 rounded-md border border-white/10 bg-black/20 px-3 py-2.5">
-        <span className="text-xs font-bold uppercase tracking-[0.08em] text-white/45">Cantidad</span>
-        <div className="flex items-center gap-2">
-          <button
-            className="grid size-9 place-items-center rounded-md border border-white/10 text-white transition hover:border-[var(--gold)]/35 hover:text-[var(--gold-bright)]"
-            onClick={() => onQuantityChange(Math.max(1, quantity - 1))}
-            type="button"
-            aria-label={`Restar unidades de ${product.name}`}
-          >
-            <Minus size={14} />
-          </button>
-          <span className="min-w-8 text-center text-sm font-bold text-white">{quantity}</span>
-          <button
-            className="grid size-9 place-items-center rounded-md border border-white/10 text-white transition hover:border-[var(--gold)]/35 hover:text-[var(--gold-bright)]"
-            onClick={() => onQuantityChange(Math.min(10, quantity + 1))}
-            type="button"
-            aria-label={`Sumar unidades de ${product.name}`}
-          >
-            <Plus size={14} />
-          </button>
+      <div className="mt-auto pt-4">
+        <div className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-black/20 px-3 py-2.5">
+          <span className="text-xs font-bold uppercase tracking-[0.08em] text-white/45">Cantidad</span>
+          <div className="flex items-center gap-2">
+            <button
+              className="grid size-9 place-items-center rounded-md border border-white/10 text-white transition hover:border-[var(--gold)]/35 hover:text-[var(--gold-bright)]"
+              onClick={() => onQuantityChange(Math.max(1, quantity - 1))}
+              type="button"
+              aria-label={`Restar unidades de ${product.name}`}
+              disabled={outOfStock}
+            >
+              <Minus size={14} />
+            </button>
+            <span className="min-w-8 text-center text-sm font-bold text-white">{quantity}</span>
+            <button
+              className="grid size-9 place-items-center rounded-md border border-white/10 text-white transition hover:border-[var(--gold)]/35 hover:text-[var(--gold-bright)]"
+              onClick={() => onQuantityChange(Math.min(10, quantity + 1))}
+              type="button"
+              aria-label={`Sumar unidades de ${product.name}`}
+              disabled={outOfStock}
+            >
+              <Plus size={14} />
+            </button>
+          </div>
         </div>
-      </div>
 
-      <FlexButton className="mt-4 w-full" onClick={() => onAdd(product, quantity)} type="button">
-        Agregar x{quantity} <ArrowRight size={18} />
-      </FlexButton>
+        <FlexButton className="mt-4 w-full" onClick={() => onAdd(product, quantity)} type="button" disabled={outOfStock}>
+          {outOfStock ? "No disponible" : <>Agregar x{quantity} <ArrowRight size={18} /></>}
+        </FlexButton>
+      </div>
     </FlexCard>
   );
 }
@@ -201,9 +183,10 @@ function CartDrawer({
 export default function ProductsPage() {
   const [mounted, setMounted] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<CategoryKey>("vip");
+  const [selectedCategory, setSelectedCategory] = useState("all");
   const [productQuantities, setProductQuantities] = useState<Record<string, number>>({});
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [productsError, setProductsError] = useState("");
   const [checkoutMessage, setCheckoutMessage] = useState("");
@@ -217,17 +200,21 @@ export default function ProductsPage() {
   const decrement = useProductCartStore((state) => state.decrement);
   const removeProduct = useProductCartStore((state) => state.removeProduct);
   const clearCart = useProductCartStore((state) => state.clearCart);
-  const allCategoryOption: CategoryOption = { key: "all", label: "Todo" };
 
+  const categoryOptions = useMemo<CategoryOption[]>(
+    () => [allCategoryOption, ...categories.map((category) => ({ key: category.slug, label: category.name }))],
+    [categories]
+  );
   const totals = useMemo(() => calculateCartTotals(items), [items]);
+  const cartCurrency = items[0]?.product.currency ?? products[0]?.currency ?? "eur";
   const productsByCategory = useMemo(() => {
-    const grouped = new Map<CategoryKey, Product[]>();
-    for (const option of [allCategoryOption, ...categoryOrder]) {
+    const grouped = new Map<string, Product[]>();
+    for (const option of categoryOptions) {
       grouped.set(option.key, []);
     }
 
     for (const product of products) {
-      const categoryKey = getCategoryKey(product.category);
+      const categoryKey = product.categorySlug ?? "uncategorized";
       const bucket = grouped.get(categoryKey) ?? [];
       bucket.push(product);
       grouped.set(categoryKey, bucket);
@@ -238,7 +225,7 @@ export default function ProductsPage() {
     }
 
     return grouped;
-  }, [products]);
+  }, [categoryOptions, products]);
 
   const visibleProducts = useMemo(() => {
     if (selectedCategory === "all") {
@@ -253,6 +240,12 @@ export default function ProductsPage() {
   }, []);
 
   useEffect(() => {
+    if (selectedCategory === "all") return;
+    if (categoryOptions.some((option) => option.key === selectedCategory)) return;
+    setSelectedCategory("all");
+  }, [categoryOptions, selectedCategory]);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function loadProducts() {
@@ -261,11 +254,12 @@ export default function ProductsPage() {
 
       try {
         const supabase = createBrowserSupabase();
-        const productList = await getActiveProducts(supabase);
+        const catalog = await getProductCatalog(supabase);
         if (!cancelled) {
-          setProducts(productList);
-          if (productList.length > 0) {
-            const validIds = new Set(productList.map((product) => product.id));
+          setCategories(catalog.categories);
+          setProducts(catalog.products);
+          if (catalog.products.length > 0) {
+            const validIds = new Set(catalog.products.map((product) => product.id));
             useProductCartStore.setState((state) => ({
               items: state.items.filter((item) => validIds.has(item.product.id) && item.product.active)
             }));
@@ -299,7 +293,7 @@ export default function ProductsPage() {
     if (checkout === "success") {
       checkoutHandledRef.current = true;
       clearCart();
-      setCheckoutMessage(`Checkout preparado. Total ${total ? formatCents(Number(total)) : "pendiente"}.`);
+      setCheckoutMessage(`Checkout preparado. Total ${total ? formatCents(Number(total), cartCurrency) : "pendiente"}.`);
       window.history.replaceState({}, "", "/app/products");
     }
 
@@ -308,7 +302,7 @@ export default function ProductsPage() {
       setCheckoutMessage("Checkout cancelado.");
       window.history.replaceState({}, "", "/app/products");
     }
-  }, [clearCart, mounted]);
+  }, [cartCurrency, clearCart, mounted]);
 
   function quantityFor(productId: string) {
     return productQuantities[productId] ?? 1;
@@ -347,7 +341,7 @@ export default function ProductsPage() {
   return (
     <>
       <div className="mx-auto max-w-6xl space-y-5 pb-28">
-        <AppPageHeader eyebrow="Productos" title="Productos" description="Catalogo de barra y merch." />
+        <AppPageHeader eyebrow="Productos" title="Productos" description="Catalogo de barra, reservas y cachimbas." />
 
         {productsError ? (
           <FlexCard tone="danger" className="p-4">
@@ -386,7 +380,7 @@ export default function ProductsPage() {
         <div className="space-y-4">
           <div className="-mx-1 overflow-x-auto px-1 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
             <div className="flex min-w-max gap-2">
-              {[{ key: "all", label: "Todo" } as CategoryOption, ...categoryOrder].map((option) => {
+              {categoryOptions.map((option) => {
                 const count = option.key === "all" ? products.length : (productsByCategory.get(option.key)?.length ?? 0);
                 const active = selectedCategory === option.key;
                 return (
@@ -400,7 +394,7 @@ export default function ProductsPage() {
                     onClick={() => setSelectedCategory(option.key)}
                     type="button"
                   >
-                    {categoryLabel(option.key)}
+                    {option.label}
                     <span
                       className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                         active ? "bg-black/12 text-black/85" : "bg-white/[0.06] text-white/55"
@@ -428,6 +422,22 @@ export default function ProductsPage() {
             />
           ))}
         </section>
+
+        {!productsLoading && !productsError && products.length === 0 ? (
+          <FlexCard className="border-dashed border-white/10 bg-white/[0.02] p-8 text-center">
+            <ShoppingBag className="mx-auto text-white/35" size={30} />
+            <h2 className="mt-4 text-lg font-bold text-white">No hay productos activos</h2>
+            <p className="mt-2 text-sm text-white/60">Cuando el catalogo tenga productos activos, apareceran aqui.</p>
+          </FlexCard>
+        ) : null}
+
+        {!productsLoading && !productsError && products.length > 0 && visibleProducts.length === 0 ? (
+          <FlexCard className="border-dashed border-white/10 bg-white/[0.02] p-8 text-center">
+            <Tag className="mx-auto text-white/35" size={30} />
+            <h2 className="mt-4 text-lg font-bold text-white">Sin productos en esta categoria</h2>
+            <p className="mt-2 text-sm text-white/60">Selecciona otra categoria o vuelve a Todo.</p>
+          </FlexCard>
+        ) : null}
       </div>
 
       <button
@@ -442,7 +452,7 @@ export default function ProductsPage() {
           </span>
         </span>
         <span className="rounded-full border border-[var(--gold)]/30 bg-[var(--gold)]/12 px-3 py-1 text-xs font-bold text-[var(--gold-bright)]">
-          {formatCents(totals.subtotalCents)}
+          {formatCents(totals.subtotalCents, cartCurrency)}
         </span>
       </button>
 
@@ -451,7 +461,7 @@ export default function ProductsPage() {
           <div className="flex items-start justify-between gap-4 border-b border-white/10 p-4 sm:p-5">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--gold)]">Carrito</p>
-              <p className="mt-1 text-sm text-white/60">Subtotal {formatCents(totals.subtotalCents)}</p>
+              <p className="mt-1 text-sm text-white/60">Subtotal {formatCents(totals.subtotalCents, cartCurrency)}</p>
             </div>
             <button
               className="gold-focus rounded-full border border-white/10 p-2 text-white transition hover:border-[var(--gold)]/35 hover:text-[var(--gold-bright)]"
@@ -480,11 +490,11 @@ export default function ProductsPage() {
                       <div className="min-w-0">
                         <div className="font-bold text-white">{item.product.name}</div>
                         <div className="mt-1 text-sm text-white/58">
-                          {item.quantity} x {formatPrice(item.product.price)}
+                          {item.quantity} x {formatPrice(item.product.price, item.product.currency)}
                         </div>
                       </div>
                       <strong className="whitespace-nowrap text-[var(--gold-bright)]">
-                        {formatCents(Math.round(item.product.price * 100) * item.quantity)}
+                        {formatCents(item.product.priceCents * item.quantity, item.product.currency)}
                       </strong>
                     </div>
 
@@ -523,11 +533,11 @@ export default function ProductsPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm text-white/70">
                 <span>Subtotal</span>
-                <strong className="text-white">{formatCents(totals.subtotalCents)}</strong>
+                <strong className="text-white">{formatCents(totals.subtotalCents, cartCurrency)}</strong>
               </div>
               <div className="flex items-center justify-between text-sm text-white/70">
                 <span>Total</span>
-                <strong className="text-[var(--gold-bright)]">{formatCents(totals.totalCents)}</strong>
+                <strong className="text-[var(--gold-bright)]">{formatCents(totals.totalCents, cartCurrency)}</strong>
               </div>
             </div>
 

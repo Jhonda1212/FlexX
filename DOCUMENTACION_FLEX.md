@@ -8273,6 +8273,59 @@ Stripe CLI puede enviar eventos auxiliares como `payment_intent.created`, `payme
 - Se simplifico el acceso al carrito para mostrar solo icono, badge y subtotal, reduciendo texto redundante.
 - Se mejoro el contraste y jerarquia visual del boton flotante del carrito con efecto glass suave, borde dorado y sombra.
 
+### Integracion real con Supabase - 2026-06-16
+
+La pagina `/app/products` ya no depende de categorias hardcodeadas para decidir el catalogo visible. Carga categorias y productos desde Supabase:
+
+- `product_categories`
+  - `id`
+  - `name`
+  - `slug`
+  - `description`
+  - `sort_order`
+  - `active`
+  - `created_at`
+  - `updated_at`
+- `products`
+  - conserva columnas legacy: `price`, `image`, `category`
+  - agrega columnas de catalogo: `category_id`, `slug`, `price_cents`, `currency`, `image_url`, `stock_quantity`, `tags`
+- `product_variants`
+  - preparado para variantes futuras por producto
+  - no se muestra todavia en la UI
+
+La migracion `supabase/migrations/20260616150000_product_categories_and_demo_catalog.sql` crea el schema incremental y agrega datos demo idempotentes:
+
+- VIP: `Mesa VIP Oro`
+- Premium: `Botella Don Julio 70`
+- Champagnes: `Botella Moet`
+- Estandar: `Cerveza Corona`
+- Cocktails: `Cocktail Margarita`
+- Refrescos y Energeticas: `Red Bull`
+- Cachimbas: `Cachimba Premium`
+
+`supabase/seed.sql` tambien contiene el mismo catalogo moderno para que un entorno recreado desde cero conserve productos demo. Las filas legacy con ids `55555555-...` se desactivan en el seed para que no aparezcan categorias antiguas.
+
+RLS:
+
+- usuarios autenticados pueden leer categorias activas, productos activos y variantes activas;
+- staff autenticado puede leer todo y gestionar categorias/productos/variantes;
+- service role conserva acceso completo para rutas servidor;
+- usuarios normales no pueden cambiar precios desde el cliente.
+
+Checkout de productos:
+
+- `/app/products` mantiene carrito local persistente con `localStorage`;
+- `/api/products/checkout` sigue siendo un checkout preparado, no Stripe final;
+- el total se recalcula en servidor desde Supabase usando `price_cents`;
+- no se confia en precios enviados desde el cliente.
+
+Para aplicar en un PC:
+
+```bash
+npx supabase migration up --local
+npm run dev
+```
+
 ### Como probar
 
 1. Ejecutar `npm run dev`.
