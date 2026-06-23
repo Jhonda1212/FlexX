@@ -8339,3 +8339,56 @@ npm run dev
 
 - Conectar `createCheckoutSession(cart)` con un checkout real de Stripe.
 - Definir persistencia en base de datos si el carrito debe sobrevivir entre dispositivos.
+
+---
+
+## Fase 1 visual compartida - 2026-06-23
+
+### Objetivo
+
+Unificar la base visual compartida de FLEX sin cambiar rutas, logica de negocio, datos ni contratos. La fase redujo ruido visual en superficies, botones, badges y cards, manteniendo la identidad oscura, carbon, dorada y premium.
+
+### Archivos modificados
+
+- `app/globals.css`
+- `components/ui/FlexButton.tsx`
+- `components/ui/FlexBadge.tsx`
+- `components/ui/FlexCard.tsx`
+
+### Tokens visuales
+
+- Se agregaron o ajustaron tokens reutilizables para superficies: `--bg-base`, `--bg-elevated`, `--bg-raised`.
+- Se centralizaron bordes suaves y dorados: `--line-soft`, `--line-muted`, `--line-gold`.
+- Se ajusto `--muted` para mejorar contraste de texto secundario.
+- Se agregaron radios guia: `--radius-control`, `--radius-card`, `--radius-panel`.
+- Se agregaron sombras sobrias: `--shadow-soft`, `--shadow-gold`.
+- Se conservo la base `--gold`, `--gold-bright`, `--background`, `--panel`, `--danger` y `--success`.
+
+### Compatibilidad preservada
+
+- `FlexButton` conserva props HTML de `button`, `variant`, `loading`, `disabled`, `className` y variantes `primary`, `ghost`, `danger`, `success`.
+- `FlexBadge` conserva `children`, `tone` y tonos `neutral`, `gold`, `success`, `danger`.
+- `FlexCard` conserva `children`, `className`, `tone` y tonos `default`, `gold`, `danger`, `success`.
+- No se cambiaron consumidores, rutas ni contratos de datos.
+
+### Validaciones ejecutadas
+
+- `git diff --check`: OK, con avisos CRLF del entorno Windows.
+- `npm run lint`: OK.
+- `npm run build`: OK.
+- Revision estatica de consumidores de `FlexButton`, `FlexBadge` y `FlexCard`.
+- Revision visual publica de `/login` en 375 px, 768 px, 1024 px y escritorio amplio.
+
+### Riesgos visuales pendientes
+
+- La revision visual de rutas protegidas quedo limitada por falta de sesion autenticada local.
+- En Tailwind v4, el orden CSS generado puede hacer que algunas clases locales no ganen aunque `className` aparezca al final.
+- Riesgo conocido: botones compactos con `h-10 min-h-0` pueden seguir afectados por `min-h-12`.
+- Riesgo conocido: cards con `p-0`, `rounded-xl` o `rounded-2xl` deben validarse visualmente con sesion real.
+- El inset dorado de `FlexBadge` y el nuevo `--muted` deben revisarse en tablas y pantallas admin autenticadas.
+
+### Fuera de alcance
+
+- No se tocaron Stripe, Supabase, RLS, migraciones, datos, rutas ni logica de negocio.
+- No se instalaron dependencias.
+- `next-env.d.ts` no forma parte de esta fase visual ni del commit propuesto.
