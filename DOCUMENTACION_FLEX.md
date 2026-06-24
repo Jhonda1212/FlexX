@@ -8493,3 +8493,50 @@ Reducir la apariencia generica del dashboard de usuario en `/app` sin cambiar ru
 
 - Validar visualmente con sesion autenticada real en desktop amplio, tablet y movil.
 - En una fase posterior, revisar si `Hoy en FLEX` y `Proximos eventos` tambien deben adoptar una estructura mas editorial para completar la reduccion de cards repetidas.
+
+---
+
+## Fase 1.3 rediseño Hoy en FLEX home - 2026-06-24
+
+### Objetivo
+
+Transformar la previsualizacion de `Hoy en FLEX` en `/app` para que funcione como cartelera editorial compacta, sin cambiar consultas, filtros, rutas, Supabase, mocks, contratos de datos ni estados funcionales.
+
+### Archivos modificados
+
+- `components/app/HomeTodayPreview.tsx`
+- `components/app/HomeUpcomingEvents.tsx`
+- `DOCUMENTACION_FLEX.md`
+
+### Cambios realizados
+
+- Se reemplazo el grid de mini-cards por una lista vertical tipo cartelera.
+- Cada publicacion muestra prioridad y tipo como microinformacion, con separadores finos en lugar de cajas independientes.
+- Se compacto el encabezado, la columna de metadata y el padding de filas para evitar huecos grandes y concatenaciones en tablet/movil.
+- Se amplio la columna de metadata de la cartelera en escritorio y se apila en tablet/movil para evitar solapes entre etiquetas largas y titulos.
+- Se corrigio el layout interno de proximos eventos para que la fecha quede en el flujo normal de la tarjeta y no se superponga con artista o titulo.
+- El titulo de cada publicacion gana jerarquia y lectura de arriba abajo.
+- `Ver mural` queda como enlace editorial secundario, no como CTA dominante.
+- Se redujeron badges, bordes, radios, fondos independientes e iconos decorativos.
+- Se mantuvieron la consulta a `daily_feed_posts`, filtros, orden, ruta `/app/today`, estados loading/error/empty y politica de datos.
+- El estado empty conserva acceso a `/app/today` con area tactil de al menos 44 px.
+
+### Como probar
+
+1. Ejecutar `npm run dev`.
+2. Abrir `/app` en escritorio amplio y confirmar que `Hoy en FLEX` se lee como cartelera, no como grid de cards.
+3. Revisar tablet y movil: la lista debe mantener lectura vertical, sin scroll horizontal ni concatenaciones como `PROGRAMACION21`.
+4. Probar foco de teclado sobre `Ver mural`.
+5. Confirmar que en proximos eventos la fecha no cubre artista, titulo ni metadata en ninguna tarjeta.
+6. Verificar estados loading, error y empty.
+
+### Validaciones ejecutadas
+
+- `npm run lint`: OK.
+- `npm run build`: OK. Aviso no bloqueante de Next.js: `middleware` esta deprecado y debe migrarse a `proxy` en una fase aparte.
+- `git diff --check`: OK.
+
+### Pendiente
+
+- Validar visualmente con sesion autenticada real y publicaciones/eventos de distintas longitudes.
+- Revisar en una fase posterior si `Proximos eventos` debe alinearse con el mismo lenguaje editorial.

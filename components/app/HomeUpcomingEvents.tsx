@@ -16,9 +16,9 @@ import {
 
 function EventCard({ event, priceLabel }: { event: FeaturedEventView; priceLabel: string }) {
   return (
-    <Link href={`/app/events/${event.id}`} prefetch={false} className="gold-focus group block min-w-0 rounded-lg">
+    <Link href={`/app/events/${event.id}`} prefetch={false} className="gold-focus group block h-full min-w-0 rounded-lg">
       <FlexCard className="h-full overflow-hidden p-0 transition-[background-color,border-color,box-shadow,transform] duration-200 ease-out group-hover:-translate-y-0.5 group-hover:border-[var(--gold)]/45 group-hover:shadow-[0_12px_28px_rgba(0,0,0,0.22)] group-active:scale-[0.99]">
-        <div className="relative h-[17rem]">
+        <div className="relative flex min-h-[21rem] overflow-hidden">
           {event.imageUrl ? (
             <OptimizedBackdropImage
               src={event.imageUrl}
@@ -31,21 +31,23 @@ function EventCard({ event, priceLabel }: { event: FeaturedEventView; priceLabel
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/10" />
           <div className="absolute inset-0 bg-[var(--gold)]/0 transition-colors duration-300 ease-out group-hover:bg-[var(--gold)]/6" />
-          <div className="absolute left-4 top-4 rounded-md border border-[var(--gold)]/35 bg-black/72 px-3 py-2 text-center shadow-[0_8px_18px_rgba(0,0,0,0.22)]">
-            <div className="text-xl font-bold text-white">{event.dateLabel.split(" ")[0]}</div>
-            <div className="text-xs text-[var(--muted)]">{event.dateLabel.split(" ")[1] ?? ""}</div>
-          </div>
-          <div className="absolute inset-x-0 bottom-0 p-4">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--gold)]">{event.artist || "FLEX Live"}</p>
-            <h3 className="mt-1 line-clamp-2 text-xl font-bold leading-tight text-white sm:text-2xl">{event.title}</h3>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-              <span className="min-w-0 truncate text-white/72">{event.zone || "FLEX"}</span>
-              <span className="h-1 w-1 rounded-full bg-white/32" />
-              <span className="min-w-0 truncate font-bold text-[var(--gold)]">{priceLabel}</span>
+          <div className="relative z-10 flex min-h-[21rem] w-full flex-col p-4">
+            <div className="w-fit rounded-md border border-[var(--gold)]/35 bg-black/72 px-3 py-2 text-center shadow-[0_8px_18px_rgba(0,0,0,0.22)]">
+              <div className="text-xl font-bold text-white">{event.dateLabel.split(" ")[0]}</div>
+              <div className="text-xs text-[var(--muted)]">{event.dateLabel.split(" ")[1] ?? ""}</div>
             </div>
-            <p className="mt-3 line-clamp-2 text-sm leading-6 text-white/70">{event.description || "Live session FLEX."}</p>
-            <div className="mt-4 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-[var(--gold)]">
-              Ver detalle <ArrowRight className="transition-transform duration-200 ease-out group-hover:translate-x-0.5" size={16} />
+            <div className="mt-8 flex min-w-0 flex-1 flex-col">
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--gold)]">{event.artist || "FLEX Live"}</p>
+              <h3 className="mt-1 line-clamp-2 text-xl font-bold leading-tight text-white sm:text-2xl">{event.title}</h3>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                <span className="min-w-0 truncate text-white/72">{event.zone || "FLEX"}</span>
+                <span className="h-1 w-1 rounded-full bg-white/32" />
+                <span className="min-w-0 truncate font-bold text-[var(--gold)]">{priceLabel}</span>
+              </div>
+              <p className="mt-3 line-clamp-2 min-h-12 text-sm leading-6 text-white/70">{event.description || "Live session FLEX."}</p>
+              <div className="mt-auto inline-flex items-center gap-2 pt-4 text-xs font-bold uppercase tracking-[0.08em] text-[var(--gold)]">
+                Ver detalle <ArrowRight className="transition-transform duration-200 ease-out group-hover:translate-x-0.5" size={16} />
+              </div>
             </div>
           </div>
         </div>
@@ -113,9 +115,9 @@ export function HomeUpcomingEvents() {
   if (loading) {
     return (
       <div className="grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] gap-4">
-        <FlexSkeleton className="h-[17rem]" />
-        <FlexSkeleton className="h-[17rem]" />
-        <FlexSkeleton className="h-[17rem]" />
+        <FlexSkeleton className="h-[21rem]" />
+        <FlexSkeleton className="h-[21rem]" />
+        <FlexSkeleton className="h-[21rem]" />
       </div>
     );
   }

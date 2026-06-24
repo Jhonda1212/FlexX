@@ -2,9 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Megaphone } from "lucide-react";
-import { FlexBadge } from "@/components/ui/FlexBadge";
-import { FlexButton } from "@/components/ui/FlexButton";
 import { FlexCard } from "@/components/ui/FlexCard";
 import { FlexSkeleton } from "@/components/ui/FlexSkeleton";
 import { createBrowserSupabase } from "@/lib/supabase";
@@ -18,17 +15,29 @@ type TodayPost = {
 
 const homeFeedTypes = new Set(["promotion", "vip", "stage", "activity", "announcement"]);
 
-function toneForPriority(priority: string): "gold" | "danger" | "neutral" {
-  if (priority === "urgent") return "danger";
-  if (priority === "high") return "gold";
-  return "neutral";
-}
-
 function pickHomePosts(posts: TodayPost[]) {
   const nonEventPosts = posts.filter((post) => homeFeedTypes.has(post.type));
   if (nonEventPosts.length > 0) return nonEventPosts.slice(0, 3);
   const eventFallback = posts.find((post) => post.type === "event");
   return eventFallback ? [eventFallback] : [];
+}
+
+function typeLabel(type: string) {
+  const labels: Record<string, string> = {
+    announcement: "Aviso",
+    promotion: "Promo",
+    vip: "VIP",
+    stage: "Escenario",
+    activity: "Actividad",
+    event: "Evento"
+  };
+  return labels[type] ?? type;
+}
+
+function priorityLabel(priority: string) {
+  if (priority === "urgent") return "Urgente";
+  if (priority === "high") return "Destacado";
+  return "Programacion";
 }
 
 export function HomeTodayPreview() {
@@ -69,52 +78,81 @@ export function HomeTodayPreview() {
   }, []);
 
   return (
-    <FlexCard className={posts.length === 0 && !loading && !error ? "py-4" : ""}>
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Megaphone className="text-[var(--gold)]" size={20} />
-          <div>
-            <h2 className="text-sm font-bold uppercase tracking-[0.08em] text-white">Hoy en FLEX</h2>
-            <p className="mt-1 text-xs leading-5 text-[var(--muted)]">Promos, avisos y movimientos rápidos de la noche.</p>
-          </div>
+    <FlexCard className={posts.length === 0 && !loading && !error ? "p-4" : "p-4 sm:p-5"}>
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--gold)]">Cartelera oficial</p>
+          <h2 className="font-display mt-1 text-3xl leading-none text-white">Hoy en FLEX</h2>
+          <p className="mt-2 text-sm leading-5 text-[var(--muted)]">Promos, avisos y movimientos rapidos de la noche.</p>
         </div>
-        <Link href="/app/today" prefetch={false} className="text-xs font-bold uppercase tracking-[0.08em] text-[var(--gold)]">Ver mural</Link>
+        <Link
+          href="/app/today"
+          prefetch={false}
+          className="gold-focus inline-flex min-h-11 w-fit shrink-0 items-center rounded-[var(--radius-control)] text-xs font-bold uppercase tracking-[0.08em] text-white/62 underline decoration-white/20 underline-offset-4 transition-colors duration-200 hover:text-[var(--gold)]"
+        >
+          Ver mural
+        </Link>
       </div>
 
       {loading ? (
-        <div className="grid gap-3 sm:grid-cols-3">
-          <FlexSkeleton className="h-16" />
-          <FlexSkeleton className="h-16" />
-          <FlexSkeleton className="h-16" />
+        <div className="divide-y divide-white/10 border-y border-white/10">
+          <FlexSkeleton className="my-3 h-14" />
+          <FlexSkeleton className="my-3 h-14" />
+          <FlexSkeleton className="my-3 h-14" />
         </div>
       ) : null}
 
       {error ? <p className="text-sm text-red-200">{error}</p> : null}
 
       {!loading && !error && posts.length === 0 ? (
-        <div className="rounded-md border border-white/10 bg-white/[0.025] px-4 py-3">
+        <div className="border-y border-white/10 py-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="font-bold text-white">Hoy todavía está tranquilo</p>
+              <p className="font-bold text-white">Hoy todavia esta tranquilo</p>
               <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
-                Promos, avisos y movimientos rápidos de la noche aparecerán aquí.
+                Promos, avisos y movimientos rapidos de la noche apareceran aqui.
               </p>
             </div>
-            <Link href="/app/today" prefetch={false} className="shrink-0">
-              <FlexButton variant="ghost" className="w-full sm:w-auto">Ver mural</FlexButton>
+            <Link
+              href="/app/today"
+              prefetch={false}
+              className="gold-focus inline-flex min-h-11 shrink-0 items-center rounded-[var(--radius-control)] text-sm font-bold text-[var(--gold)] underline decoration-[var(--gold)]/30 underline-offset-4"
+            >
+              Ver mural
             </Link>
           </div>
         </div>
       ) : null}
 
       {posts.length > 0 ? (
-        <div className="grid gap-3 sm:grid-cols-3">
-          {posts.map((post) => (
-            <div key={post.id} className="rounded-md border border-white/10 bg-white/[0.03] p-4 transition-[background-color,border-color,transform] duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--gold)]/30 hover:bg-white/[0.05]">
-              <FlexBadge tone={toneForPriority(post.priority)}>{post.type}</FlexBadge>
-              <div className="mt-3 line-clamp-2 text-sm font-bold text-white">{post.title}</div>
-            </div>
-          ))}
+        <div className="border-y border-white/10">
+          {posts.map((post, index) => {
+            const priority = priorityLabel(post.priority);
+            const type = typeLabel(post.type);
+            const highlighted = post.priority === "urgent" || post.priority === "high";
+
+            return (
+              <article
+                key={post.id}
+                className={`grid gap-2.5 py-2.5 ${index > 0 ? "border-t border-white/10" : ""} lg:grid-cols-[8rem_minmax(0,1fr)] lg:gap-4`}
+              >
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 lg:block">
+                    <div className={`text-[11px] font-bold uppercase leading-4 tracking-[0.12em] ${highlighted ? "text-[var(--gold)]" : "text-white/52"}`}>
+                      {priority}
+                    </div>
+                    <div className="hidden mt-1.5 h-px bg-[linear-gradient(90deg,rgba(217,166,64,0.34),transparent)] lg:block" />
+                    <div className="text-[11px] font-semibold uppercase leading-4 tracking-[0.1em] text-white/48 lg:mt-1.5">
+                      {type}
+                    </div>
+                  </div>
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-base font-bold leading-6 text-white">{post.title}</h3>
+                </div>
+              </article>
+            );
+          })}
         </div>
       ) : null}
     </FlexCard>
