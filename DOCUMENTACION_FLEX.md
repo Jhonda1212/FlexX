@@ -8540,3 +8540,49 @@ Transformar la previsualizacion de `Hoy en FLEX` en `/app` para que funcione com
 
 - Validar visualmente con sesion autenticada real y publicaciones/eventos de distintas longitudes.
 - Revisar en una fase posterior si `Proximos eventos` debe alinearse con el mismo lenguaje editorial.
+
+---
+
+## Fase 1.4 rediseño Mi noche home - 2026-06-24
+
+### Objetivo
+
+Convertir `Mi noche` en `/app` en un pase editorial y operativo, sin cambiar datos, rutas, Supabase, mocks, contratos ni logica de negocio.
+
+### Archivos modificados
+
+- `components/app/HomeNightStatus.tsx`
+- `DOCUMENTACION_FLEX.md`
+
+### Cambios realizados
+
+- Se elimino la competencia visual entre `Mi noche` y `Estado personal`.
+- `#4` pasa a ser el dato principal del modulo y organiza turno, espera y accion.
+- `Turno en vivo`, `Tu posicion estimada`, `20 - 30 min` y `Revisar turno` quedan integrados en una composicion compacta.
+- La entrada `Jazz Nights` queda como franja interna con QR, tipo, estado `Valida` y enlace `Ver QR`.
+- Se redujeron contenedores internos, espacio vacio, uppercase, pills y botones full-width.
+- Ajuste final: la zona de turno organiza `Turno en vivo`, `Espera estimada · 20 - 30 min` y `Revisar turno` en columna a la derecha de `#4`.
+- Se elimino la linea vertical dorada del turno para evitar lectura de tabla administrativa.
+- La microetiqueta `Tu posicion estimada` queda subordinada bajo `#4` y no compite con espera ni accion.
+- En la entrada se separo `Jazz Nights` de `Valida` con espacio y divisor suave, manteniendo QR, tipo de entrada y `Ver QR` en la franja compacta.
+- Se conservaron rutas `/app/my-turn` y `/app/tickets`, textos funcionales y datos actuales.
+- VIP se mantuvo sin cambios.
+
+### Como probar
+
+1. Ejecutar `npm run dev`.
+2. Abrir `/app` en escritorio amplio y confirmar que `Mi noche` funciona como resumen lateral compacto.
+3. Revisar tablet y movil: sin scroll horizontal, sin cortes en `Jazz Nights`, `Valida`, `Ver QR` ni `20 - 30 min`.
+4. Confirmar que `Espera estimada · 20 - 30 min` se mantiene en una linea cuando el ancho lo permite y que el modulo crece naturalmente con textos largos.
+5. Probar foco de teclado sobre `Revisar turno` y `Ver QR`; ambos conservan area tactil minima de 44 px.
+6. Confirmar que los enlaces conservan `/app/my-turn` y `/app/tickets`.
+
+### Validaciones ejecutadas
+
+- `npm run lint`: OK.
+- `npm run build`: OK. Aviso no bloqueante de Next.js: `middleware` esta deprecado y debe migrarse a `proxy` en una fase aparte.
+- `git diff --check`: OK.
+
+### Pendiente
+
+- Validar visualmente con sesion autenticada real en desktop amplio, tablet y movil.

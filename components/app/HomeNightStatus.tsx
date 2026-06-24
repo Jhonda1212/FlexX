@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { Crown, Mic2, QrCode } from "lucide-react";
-import { FlexBadge } from "@/components/ui/FlexBadge";
+import { Crown, QrCode } from "lucide-react";
 import { FlexCard } from "@/components/ui/FlexCard";
 
 export function HomeNightStatus() {
@@ -8,53 +7,54 @@ export function HomeNightStatus() {
     <aside className="content-auto order-3 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,250px),1fr))] gap-6 2xl:sticky 2xl:top-8 2xl:order-2 2xl:col-start-2 2xl:row-span-2 2xl:row-start-1 2xl:block 2xl:space-y-5 2xl:self-start">
       <FlexCard className="paint-contain overflow-hidden p-0">
         <div className="border-b border-white/10 px-5 py-4">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--gold)]">Mi noche</p>
-          <h2 className="font-display mt-1 text-3xl leading-none text-white">Estado personal</h2>
+          <h2 className="font-display text-3xl leading-none text-white">Mi noche</h2>
+          <p className="mt-2 text-sm leading-5 text-[var(--muted)]">Tu pase operativo para seguir el ritmo.</p>
         </div>
 
-        <div className="grid divide-y divide-white/10">
-          <div className="px-5 py-5">
-            <div className="flex items-start justify-between gap-5">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 text-sm font-semibold text-white/82">
-                  <Mic2 className="text-[var(--gold)]" size={17} />
-                  <span>Turno en vivo</span>
-                </div>
-                <p className="mt-2 text-sm text-[var(--muted)]">Tu posicion estimada</p>
-              </div>
-              <div className="text-right">
-                <div className="font-display text-6xl leading-none text-[var(--gold)]">#4</div>
-                <div className="mt-1 text-sm text-white/70">20 - 30 min</div>
-              </div>
+        <div className="px-5 py-5">
+          <div className="flex items-start gap-5">
+            <div className="w-20 shrink-0">
+              <div className="font-display text-6xl leading-none text-[var(--gold)]">#4</div>
+              <p className="mt-1 max-w-16 text-xs font-semibold leading-4 text-white/52">Tu posicion estimada</p>
             </div>
-            <Link
-              href="/app/my-turn"
-              prefetch={false}
-              className="gold-focus mt-4 inline-flex min-h-11 items-center rounded-[var(--radius-control)] text-sm font-bold text-[var(--gold)] underline decoration-[var(--gold)]/30 underline-offset-4 transition-colors duration-200 hover:text-[var(--gold-bright)]"
-            >
-              Revisar turno
-            </Link>
+
+            <div className="min-w-0 flex-1 pt-1.5">
+              <p className="text-base font-bold text-white">Turno en vivo</p>
+              <p className="mt-2 text-sm leading-5 text-white/78">
+                <span className="text-[var(--muted)]">Espera estimada</span>
+                <span className="mx-1 text-white/28">·</span>
+                <span className="whitespace-nowrap font-semibold text-white/86">20 - 30 min</span>
+              </p>
+
+              <Link
+                href="/app/my-turn"
+                prefetch={false}
+                className="gold-focus mt-2 inline-flex min-h-11 items-center rounded-[var(--radius-control)] text-sm font-bold text-[var(--gold)] underline decoration-[var(--gold)]/30 underline-offset-4 transition-colors duration-200 hover:text-[var(--gold-bright)]"
+              >
+                Revisar turno
+              </Link>
+            </div>
           </div>
 
-          <div className="px-5 py-5">
-            <div className="flex items-start gap-4">
-              <div className="mt-1 grid size-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-white text-black">
-                <QrCode size={24} />
+          <div className="mt-5 border-t border-white/10 pt-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="grid size-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-white text-black">
+                <QrCode size={22} />
               </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-bold text-white">Jazz Nights</h3>
-                  <FlexBadge tone="success">Valida</FlexBadge>
+              <div className="min-w-0 flex-1 pr-1">
+                <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <h3 className="min-w-0 break-words font-bold text-white">Jazz Nights</h3>
+                  <span className="shrink-0 border-l border-white/12 pl-3 text-xs font-semibold text-emerald-200">Valida</span>
                 </div>
-                <p className="mt-1 text-sm text-[var(--muted)]">Entrada general</p>
-                <Link
-                  href="/app/tickets"
-                  prefetch={false}
-                  className="gold-focus mt-3 inline-flex min-h-11 items-center rounded-[var(--radius-control)] text-sm font-bold text-white/84 underline decoration-white/20 underline-offset-4 transition-colors duration-200 hover:text-[var(--gold)]"
-                >
-                  Ver QR
-                </Link>
+                <p className="mt-0.5 text-sm text-[var(--muted)]">Entrada general</p>
               </div>
+              <Link
+                href="/app/tickets"
+                prefetch={false}
+                className="gold-focus inline-flex min-h-11 shrink-0 items-center rounded-[var(--radius-control)] text-sm font-bold text-white/84 underline decoration-white/20 underline-offset-4 transition-colors duration-200 hover:text-[var(--gold)]"
+              >
+                Ver QR
+              </Link>
             </div>
           </div>
         </div>
