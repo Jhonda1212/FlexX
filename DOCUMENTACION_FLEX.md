@@ -8392,3 +8392,54 @@ Unificar la base visual compartida de FLEX sin cambiar rutas, logica de negocio,
 - No se tocaron Stripe, Supabase, RLS, migraciones, datos, rutas ni logica de negocio.
 - No se instalaron dependencias.
 - `next-env.d.ts` no forma parte de esta fase visual ni del commit propuesto.
+
+---
+
+## Fase 1.1 correccion funcional dashboard usuario - 2026-06-24
+
+### Objetivo
+
+Corregir dos puntos funcionales del dashboard de usuario en `/app` sin cambiar rutas, contratos de datos, Supabase, RLS, Stripe, migraciones ni la base visual compartida.
+
+### Archivos modificados
+
+- `components/layout/AppShell.tsx`
+- `components/app/HomeEventCarousel.tsx`
+- `DOCUMENTACION_FLEX.md`
+
+### Cambios realizados
+
+- La navegacion movil ya no depende de mostrar solo `safeNav.slice(0, 5)` como unica via.
+- La barra inferior movil conserva accesos primarios y agrega un boton `Menu`.
+- El boton de menu superior movil y el boton `Menu` inferior abren un panel de navegacion movil con todas las rutas reales de `safeNav`.
+- El panel movil marca la ruta activa con `aria-current`, se comporta como dialogo modal con `role="dialog"` y `aria-modal="true"`, mueve el foco al abrir, atrapa `Tab`/`Shift+Tab`, restaura el foco al boton que lo abrio, tiene cierre por boton, cierre por fondo, cierre con `Escape` y cierre automatico al cambiar de ruta.
+- Mientras el panel movil esta abierto se bloquea el scroll de `document.body` y al cerrar se restaura el valor previo de `document.body.style.overflow`.
+- Rutas como `/app/tickets`, `/app/vip`, `/app/profile` y `/app/notifications` quedan accesibles desde el panel movil sin inventar rutas nuevas.
+- El carrusel de eventos solo usa fallback local cuando `NEXT_PUBLIC_ENABLE_MOCKS=true`.
+- Con mocks desactivados, si Supabase falla o solo hay datos locales de fallback, el carrusel muestra un error visible en lugar de sustituir silenciosamente con eventos demo.
+
+### Como probar
+
+1. Ejecutar `npm run dev`.
+2. Abrir `/app` en viewport movil autenticado.
+3. Pulsar el boton de menu superior o el boton `Menu` de la barra inferior.
+4. Confirmar que aparecen todas las rutas de usuario, incluidas `Entradas`, `VIP`, `Perfil` y `Avisos`.
+5. Navegar a una ruta y confirmar que el panel se cierra y la ruta activa queda marcada.
+6. Abrir el menu desde el boton superior y desde el boton inferior, confirmar que el foco entra al dialogo y vuelve al mismo boton al cerrar.
+7. Recorrer el panel con `Tab` y `Shift+Tab` y confirmar que el foco no sale del dialogo.
+8. Abrir el menu y cerrarlo con `Escape`, con el boton de cierre, pulsando el fondo oscuro y navegando a otra ruta.
+9. Confirmar que el fondo no se desplaza mientras el menu esta abierto y que el scroll vuelve al cerrar.
+10. Con `NEXT_PUBLIC_ENABLE_MOCKS=true`, simular fallo de Supabase y confirmar que el carrusel puede usar datos demo.
+11. Con `NEXT_PUBLIC_ENABLE_MOCKS=false` o vacio, simular fallo de Supabase y confirmar que el carrusel muestra error visible sin eventos demo.
+
+### Validaciones ejecutadas
+
+- `npm run lint`: OK.
+- `npm run build`: OK. Aviso no bloqueante de Next.js: `middleware` esta deprecado y debe migrarse a `proxy` en una fase aparte.
+- `git diff --check`: OK.
+
+### Pendiente
+
+- Revisar visualmente `/app` con sesion autenticada real en movil y escritorio.
+- Decidir en una fase futura si la barra inferior movil debe priorizar otros accesos segun uso real del local.
+- Migrar `middleware.ts` a `proxy` cuando se planifique mantenimiento de infraestructura Next.js.

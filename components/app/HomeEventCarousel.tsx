@@ -8,7 +8,7 @@ import { FlexCard } from "@/components/ui/FlexCard";
 import { FlexSkeleton } from "@/components/ui/FlexSkeleton";
 import { OptimizedBackdropImage } from "@/components/ui/OptimizedBackdropImage";
 import { featuredEvents } from "@/lib/featured-events";
-import { listFeaturedPublishedEvents, type FeaturedEventView } from "@/lib/flex-actions";
+import { listFeaturedPublishedEvents, mocksEnabled, type FeaturedEventView } from "@/lib/flex-actions";
 
 const carouselIntervalMs = 5600;
 
@@ -38,8 +38,8 @@ function fallbackHeroEvents(): FeaturedEventView[] {
   });
 }
 
-function mergeWithFallback(events: FeaturedEventView[]) {
-  if (events.length >= 3) return events.slice(0, 5);
+function mergeWithFallback(events: FeaturedEventView[], allowFallback: boolean) {
+  if (!allowFallback || events.length >= 3) return events.slice(0, 5);
   const existingIds = new Set(events.map((event) => event.id));
   const fallback = fallbackHeroEvents().filter((event) => !existingIds.has(event.id));
   return [...events, ...fallback].slice(0, 5);
@@ -77,19 +77,41 @@ function HomeEventCarouselComponent() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [paused, setPaused] = useState(false);
+  const [error, setError] = useState("");
   const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     let active = true;
+    const allowMocks = mocksEnabled();
+
     listFeaturedPublishedEvents(5)
       .then((data) => {
-        if (active) setEvents(mergeWithFallback(data));
+        if (!active) return;
+
+        if (!allowMocks) {
+          const supabaseEvents = data.filter((event) => event.source === "supabase");
+          setEvents(supabaseEvents.slice(0, 5));
+          setError(supabaseEvents.length > 0 ? "" : "No hay eventos destacados publicados desde Supabase ahora mismo.");
+          return;
+        }
+
+        setEvents(mergeWithFallback(data, true));
+        setError("");
       })
       .catch((loadError) => {
         if (process.env.NODE_ENV !== "production") {
           console.error("Supabase hero events load error", loadError);
         }
-        if (active) setEvents(fallbackHeroEvents().slice(0, 3));
+        if (!active) return;
+
+        if (allowMocks) {
+          setEvents(fallbackHeroEvents().slice(0, 3));
+          setError("");
+          return;
+        }
+
+        setEvents([]);
+        setError("No pudimos cargar los eventos destacados desde Supabase. Revisa la conexion y los eventos publicados.");
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -140,8 +162,27 @@ function HomeEventCarouselComponent() {
     );
   }
 
+  if (error) {
+    return (
+      <FlexCard tone="danger" className="soft-enter">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-red-200">Eventos destacados</p>
+        <h2 className="font-display mt-3 text-3xl text-white">No se pudo preparar el carrusel</h2>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-red-100/82">{error}</p>
+        <Link href="/app/events" prefetch={false} className="mt-5 inline-flex text-sm font-bold text-red-100 underline decoration-red-200/40 underline-offset-4">
+          Ver pagina de eventos
+        </Link>
+      </FlexCard>
+    );
+  }
+
   if (!activeEvent) {
-    return null;
+    return (
+      <FlexCard className="soft-enter">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--gold)]">Eventos destacados</p>
+        <h2 className="font-display mt-3 text-3xl text-white">Sin eventos destacados</h2>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted)]">Cuando admin publique eventos futuros, apareceran aqui.</p>
+      </FlexCard>
+    );
   }
 
   return (

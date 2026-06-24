@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Bell, LogOut, Menu } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Bell, LogOut, Menu, X } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 import type { NavItem } from "@/lib/types";
 import { createBrowserSupabase } from "@/lib/supabase";
@@ -38,6 +38,12 @@ export function AppShell({
   const [resolvedRole, setResolvedRole] = useState<AppRole | null>(role);
   const [roleLoading, setRoleLoading] = useState(staff && !role);
   const [roleError, setRoleError] = useState("");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const topMenuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const bottomMenuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const closeMenuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const mobileDialogRef = useRef<HTMLDivElement | null>(null);
+  const mobileNavTriggerRef = useRef<HTMLButtonElement | null>(null);
   const effectiveRole = role ?? resolvedRole;
   const visibleNav = useMemo(
     () => effectiveRole && effectiveRole !== "admin" ? getNavForRole(effectiveRole) : nav,
@@ -55,6 +61,7 @@ export function AppShell({
     () => hideHeaderPrefixes.some((prefix) => pathname.startsWith(prefix)),
     [hideHeaderPrefixes, pathname]
   );
+  const mobilePrimaryNav = useMemo(() => safeNav.slice(0, 4), [safeNav]);
 
   useEffect(() => {
     if (!staff || role) return;
@@ -98,6 +105,74 @@ export function AppShell({
       window.clearTimeout(timeoutId);
     };
   }, [role, staff]);
+
+  useEffect(() => {
+    if (mobileNavOpen) closeMobileNav();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.requestAnimationFrame(() => {
+      closeMenuButtonRef.current?.focus();
+    });
+
+    function handleDialogKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeMobileNav();
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+
+      const dialog = mobileDialogRef.current;
+      if (!dialog) return;
+
+      const focusable = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((element) => !element.hasAttribute("disabled") && element.offsetParent !== null);
+
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    window.addEventListener("keydown", handleDialogKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleDialogKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileNavOpen]);
+
+  function openMobileNav(trigger: HTMLButtonElement | null) {
+    mobileNavTriggerRef.current = trigger;
+    setMobileNavOpen(true);
+  }
+
+  function closeMobileNav() {
+    setMobileNavOpen(false);
+    window.requestAnimationFrame(() => {
+      mobileNavTriggerRef.current?.focus();
+    });
+  }
 
   async function signOut() {
     try {
@@ -178,9 +253,18 @@ export function AppShell({
         <header className="mb-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <button
+              ref={topMenuButtonRef}
               className={`${iconButtonClass} lg:hidden`}
-              aria-label="Ir al inicio"
-              onClick={() => router.push(safeNav[0]?.href ?? "/app")}
+              aria-controls="mobile-app-nav"
+              aria-expanded={mobileNavOpen}
+              aria-label={mobileNavOpen ? "Cerrar navegacion" : "Abrir navegacion"}
+              onClick={() => {
+                if (mobileNavOpen) {
+                  closeMobileNav();
+                } else {
+                  openMobileNav(topMenuButtonRef.current);
+                }
+              }}
             >
               <Menu size={22} />
             </button>
@@ -208,9 +292,65 @@ export function AppShell({
         {children}
       </main>
 
+      {mobileNavOpen ? (
+        <div className="fixed inset-0 z-30 lg:hidden" role="presentation">
+          <button
+            className="absolute inset-0 h-full w-full cursor-default bg-black/72"
+            aria-label="Cerrar navegacion"
+            type="button"
+            onClick={closeMobileNav}
+          />
+          <div
+            ref={mobileDialogRef}
+            id="mobile-app-nav"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="mobile-app-nav-title"
+            className="absolute inset-x-3 bottom-24 rounded-lg border border-white/10 bg-[var(--panel)] p-3 shadow-[0_24px_80px_rgba(0,0,0,0.42)]"
+          >
+            <div className="mb-3 flex items-center justify-between gap-3 border-b border-white/10 pb-3">
+              <div id="mobile-app-nav-title">
+                <Logo staff={staff} />
+              </div>
+              <button
+                ref={closeMenuButtonRef}
+                className={iconButtonClass}
+                aria-label="Cerrar navegacion"
+                type="button"
+                onClick={closeMobileNav}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <nav aria-label="Navegacion movil" className="grid max-h-[58dvh] gap-2 overflow-y-auto pr-1">
+              {safeNav.map((item) => {
+                const active = pathname === item.href;
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    prefetch={false}
+                    aria-current={active ? "page" : undefined}
+                    className={`gold-focus flex min-h-14 items-center gap-3 rounded-md border px-4 text-sm font-bold transition-[background-color,border-color,color,transform] duration-200 ease-out active:scale-[0.99] ${
+                      active
+                        ? "border-[var(--gold)]/30 bg-[var(--gold)]/12 text-[var(--gold)]"
+                        : "border-white/10 bg-white/[0.025] text-white/78 hover:border-[var(--gold)]/25 hover:bg-[var(--gold)]/8 hover:text-white"
+                    }`}
+                  >
+                    <Icon size={22} />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+        </div>
+      ) : null}
+
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-white/10 bg-black/94 px-2 py-2 lg:hidden">
         <div className="grid grid-cols-5 gap-1">
-          {safeNav.slice(0, 5).map((item) => {
+          {mobilePrimaryNav.map((item) => {
             const active = pathname === item.href;
             const Icon = item.icon;
             return (
@@ -230,6 +370,28 @@ export function AppShell({
               </Link>
             );
           })}
+          <button
+            ref={bottomMenuButtonRef}
+            type="button"
+            aria-controls="mobile-app-nav"
+            aria-expanded={mobileNavOpen}
+            aria-label={mobileNavOpen ? "Cerrar navegacion" : "Abrir navegacion completa"}
+            className={`gold-focus flex h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border text-[11px] font-bold transition-[background-color,border-color,color,transform] duration-200 ease-out active:scale-[0.98] ${
+              mobileNavOpen
+                ? "border-[var(--gold)]/25 bg-[var(--gold)]/12 text-[var(--gold)]"
+                : "border-transparent text-white/68 hover:border-[var(--gold)]/20 hover:bg-[var(--gold)]/8 hover:text-white"
+            }`}
+            onClick={() => {
+              if (mobileNavOpen) {
+                closeMobileNav();
+              } else {
+                openMobileNav(bottomMenuButtonRef.current);
+              }
+            }}
+          >
+            <Menu className="transition-colors duration-200" size={22} />
+            <span>Menu</span>
+          </button>
         </div>
       </nav>
     </div>
