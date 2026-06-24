@@ -8443,3 +8443,53 @@ Corregir dos puntos funcionales del dashboard de usuario en `/app` sin cambiar r
 - Revisar visualmente `/app` con sesion autenticada real en movil y escritorio.
 - Decidir en una fase futura si la barra inferior movil debe priorizar otros accesos segun uso real del local.
 - Migrar `middleware.ts` a `proxy` cuando se planifique mantenimiento de infraestructura Next.js.
+
+---
+
+## Fase 1.2 rediseño visual dashboard usuario - 2026-06-24
+
+### Objetivo
+
+Reducir la apariencia generica del dashboard de usuario en `/app` sin cambiar rutas, datos, Supabase, mocks, RLS, Stripe, migraciones, `AppShell`, estilos globales ni componentes UI compartidos.
+
+### Archivos modificados
+
+- `app/app/page.tsx`
+- `components/app/HomeQuickActions.tsx`
+- `components/app/HomeNightStatus.tsx`
+- `DOCUMENTACION_FLEX.md`
+
+### Cambios realizados
+
+- Se reemplazo el grid de cinco tarjetas de accesos rapidos por `HomeQuickActions`.
+- `HomeQuickActions` conserva las cinco rutas existentes y separa acciones principales (`Pedir cancion`, `Mi turno`) de accesos secundarios (`Mis entradas`, `Salas VIP`, `Productos`).
+- Se elimino el icono decorativo `Sparkles` y se redujeron cajas de iconos, flechas repetidas, bordes y radios.
+- Se mantuvieron enlaces completos, foco visible y areas tactiles de al menos 44 px.
+- Se reemplazaron las cards separadas de `Mi turno` y `Mis entradas` por `HomeNightStatus`, agrupadas como `Mi noche`.
+- `Mi noche` conserva `#4`, `20 - 30 min`, `Jazz Nights`, `Entrada general` y estado `Valida` sin inventar datos nuevos.
+- VIP se mantiene como bloque editorial diferenciado dentro de la misma columna visual.
+- Se mantuvieron carrusel, Hoy en FLEX, proximos eventos, rutas y logica de negocio sin cambios.
+
+### Como probar
+
+1. Ejecutar `npm run dev`.
+2. Abrir `/app` en escritorio amplio y confirmar que el carrusel, accesos y columna lateral se ven en primera pantalla sin mosaico repetitivo.
+3. Confirmar que los accesos llevan a:
+   - `/app/song-request`
+   - `/app/my-turn`
+   - `/app/tickets`
+   - `/app/vip`
+   - `/app/products`
+4. Revisar tablet y movil: no debe haber scroll horizontal y todas las acciones deben seguir visibles.
+5. Probar navegacion por teclado sobre accesos y links laterales.
+
+### Validaciones ejecutadas
+
+- `npm run lint`: OK.
+- `npm run build`: OK. Aviso no bloqueante de Next.js: `middleware` esta deprecado y debe migrarse a `proxy` en una fase aparte.
+- `git diff --check`: OK.
+
+### Pendiente
+
+- Validar visualmente con sesion autenticada real en desktop amplio, tablet y movil.
+- En una fase posterior, revisar si `Hoy en FLEX` y `Proximos eventos` tambien deben adoptar una estructura mas editorial para completar la reduccion de cards repetidas.
