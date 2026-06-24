@@ -8492,6 +8492,48 @@ Reducir la apariencia generica del dashboard de usuario en `/app` sin cambiar ru
 ### Pendiente
 
 - Validar visualmente con sesion autenticada real en desktop amplio, tablet y movil.
+
+---
+
+## Fase 1.5 accesibilidad carrusel principal - 2026-06-24
+
+### Objetivo
+
+Corregir semantica interactiva y areas tactiles del carrusel principal de `/app` sin cambiar autoplay, datos, rutas, consultas, Supabase, mocks ni diseno general.
+
+### Archivos modificados
+
+- `components/app/HomeEventCarousel.tsx`
+- `DOCUMENTACION_FLEX.md`
+
+### Cambios realizados
+
+- El CTA `Ver detalles` deja de renderizar un `button` dentro de un `Link`.
+- `Ver detalles` queda como enlace navegable con apariencia de boton y conserva `/app/events/[eventId]`.
+- Los botones anterior y siguiente pasan a un area interactiva minima de 44 x 44 px.
+- Los indicadores conservan punto visual pequeno, pero cada boton clicable mide 44 x 44 px.
+- Los indicadores agregan nombres accesibles con numero y titulo de evento.
+- El indicador activo se marca con `aria-current`.
+- Se conserva foco visible con `gold-focus` y navegacion por teclado.
+
+### Como probar
+
+1. Ejecutar `npm run dev`.
+2. Abrir `/app` con sesion autenticada.
+3. Navegar con teclado por `Ver detalles`, anterior, indicadores y siguiente.
+4. Confirmar que `Ver detalles` navega a `/app/events/[eventId]`.
+5. Confirmar que anterior/siguiente e indicadores cambian de slide y mantienen foco visible.
+6. Revisar en movil que los controles tienen area tactil suficiente y no generan scroll horizontal.
+
+### Validaciones ejecutadas
+
+- `npm run lint`: OK.
+- `npm run build`: OK. Aviso no bloqueante de Next.js: `middleware` esta deprecado y debe migrarse a `proxy` en una fase aparte.
+- `git diff --check`: OK.
+
+### Pendiente
+
+- Validar con lector de pantalla que el anuncio del indicador activo resulte claro.
 - En una fase posterior, revisar si `Hoy en FLEX` y `Proximos eventos` tambien deben adoptar una estructura mas editorial para completar la reduccion de cards repetidas.
 
 ---

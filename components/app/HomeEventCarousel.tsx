@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { memo, useEffect, useMemo, useState } from "react";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
-import { FlexButton } from "@/components/ui/FlexButton";
 import { FlexCard } from "@/components/ui/FlexCard";
 import { FlexSkeleton } from "@/components/ui/FlexSkeleton";
 import { OptimizedBackdropImage } from "@/components/ui/OptimizedBackdropImage";
@@ -241,39 +240,46 @@ function HomeEventCarouselComponent() {
             <span>{activeEvent.zone || "FLEX"}</span>
           </div>
           {activeEvent.description ? <p className="mt-4 line-clamp-1 max-w-lg text-sm leading-6 text-white/72 sm:line-clamp-2">{activeEvent.description}</p> : null}
-          <Link href={`/app/events/${activeEvent.id}`} prefetch={false} className="mt-5 w-full sm:w-fit">
-            <FlexButton className="w-full sm:w-auto">
-              Ver detalles <ArrowRight size={18} />
-            </FlexButton>
+          <Link
+            href={`/app/events/${activeEvent.id}`}
+            prefetch={false}
+            className="gold-focus mt-5 inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-control)] border border-[var(--gold)]/70 bg-[var(--gold)] px-5 text-sm font-bold uppercase tracking-[0.08em] text-black shadow-[0_10px_24px_rgba(217,166,64,0.12)] transition-[background-color,border-color,box-shadow,color,transform,opacity] duration-200 ease-out hover:-translate-y-px hover:border-[var(--gold-bright)] hover:bg-[var(--gold-bright)] hover:shadow-[0_12px_28px_rgba(217,166,64,0.16)] active:translate-y-0 active:scale-[0.985] sm:w-fit"
+          >
+            Ver detalles <ArrowRight size={18} />
           </Link>
         </div>
 
         <div className="absolute right-4 top-4 z-10 flex items-center gap-1.5 rounded-full border border-white/10 bg-black/42 p-1 shadow-[0_8px_18px_rgba(0,0,0,0.14)] sm:right-6 sm:top-6 2xl:right-8 2xl:top-8">
           <button
-            className="gold-focus grid size-9 place-items-center rounded-full text-white/58 transition-[background-color,color,opacity] duration-200 ease-out hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-35 sm:size-8"
-            aria-label="Evento anterior"
+            className="gold-focus grid size-11 place-items-center rounded-full text-white/58 transition-[background-color,color,opacity] duration-200 ease-out hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+            aria-label="Mostrar evento anterior"
             disabled={!canRotate}
             onClick={() => move("previous")}
             type="button"
           >
             <ChevronLeft size={18} />
           </button>
-          <div className="flex items-center gap-1.5 px-1">
+          <div className="flex items-center gap-0.5" role="group" aria-label="Seleccionar evento destacado">
             {events.map((event, index) => (
               <button
                 key={`${event.id}-dot-${index}`}
                 type="button"
-                aria-label={`Mostrar evento ${index + 1}`}
-                className={`gold-focus h-2 w-2 rounded-full transition-[background-color,opacity] duration-200 ${
-                  index === activeIndex ? "bg-[var(--gold-bright)] opacity-100" : "bg-white/28 opacity-55 hover:bg-white/52 hover:opacity-80"
-                }`}
+                aria-label={`Mostrar evento ${index + 1}: ${event.title}`}
+                aria-current={index === activeIndex ? "true" : undefined}
+                className="gold-focus group grid size-11 place-items-center rounded-full"
                 onClick={() => setActiveIndex(index)}
-              />
+              >
+                <span
+                  className={`block h-2 w-2 rounded-full transition-[background-color,opacity] duration-200 ${
+                    index === activeIndex ? "bg-[var(--gold-bright)] opacity-100" : "bg-white/28 opacity-55 group-hover:bg-white/52 group-hover:opacity-80"
+                  }`}
+                />
+              </button>
             ))}
           </div>
           <button
-            className="gold-focus grid size-9 place-items-center rounded-full text-white/58 transition-[background-color,color,opacity] duration-200 ease-out hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-35 sm:size-8"
-            aria-label="Evento siguiente"
+            className="gold-focus grid size-11 place-items-center rounded-full text-white/58 transition-[background-color,color,opacity] duration-200 ease-out hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+            aria-label="Mostrar evento siguiente"
             disabled={!canRotate}
             onClick={() => move("next")}
             type="button"
