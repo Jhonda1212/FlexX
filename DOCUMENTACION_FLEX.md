@@ -1,5 +1,42 @@
 # DOCUMENTACION FLEX
 
+## Fase `/app/today` - imagen editorial en publicacion unica
+
+### Archivos modificados
+
+- `components/feed/FeedPostCard.tsx`
+- `components/feed/FeedRail.tsx`
+- `DOCUMENTACION_FLEX.md`
+
+### Cambios realizados
+
+- La variante `wide` de una sola publicacion reutiliza la imagen existente de `daily_feed_posts.image_url`.
+- Si el post no tiene imagen propia, se usa la imagen relacionada ya disponible en `events.image_url` o `events.cover_image_path`.
+- Cuando existe imagen real, la publicacion unica reserva una columna visual desde `xl` y mantiene metadata, titulo, descripcion y CTA en el bloque editorial.
+- En tablet y movil, la imagen queda arriba y el contenido debajo, con crecimiento natural y sin scroll horizontal.
+- Cuando no hay imagen real, se conserva la composicion textual amplia ya implementada, sin hueco reservado para media.
+- Las publicaciones de 2 y 3+ elementos conservan el grid responsive actual.
+- No se modificaron consultas, contratos, rutas, Supabase, mocks, RLS, migraciones ni Stripe.
+
+### Como probar
+
+1. Ejecutar `npm run dev`.
+2. Abrir `/app/today` con una seccion inferior que tenga una sola publicacion con imagen, por ejemplo Escenario o Eventos.
+3. En 1440 y 1280 px, confirmar imagen a la izquierda ocupando cerca de un tercio del ancho y CTA cerrando la fila.
+4. En 1024, 768 y 390 px, confirmar imagen arriba, contenido debajo, sin cortes ni scroll horizontal.
+5. Revisar una publicacion unica sin imagen: debe mantener la fila editorial textual, sin hueco vacio.
+6. Probar foco de teclado sobre CTA o enlace de evento; no debe haber enlaces anidados.
+
+### Validaciones ejecutadas
+
+- `npm run lint`: OK.
+- `npm run build`: OK. Aviso no bloqueante de Next.js: `middleware` esta deprecado y debe migrarse a `proxy` en una fase aparte.
+- `git diff --check`: OK.
+
+### Pendiente
+
+- Validar visualmente con datos reales de publicaciones con y sin imagen.
+
 ## 1. Que es FLEX
 
 FLEX es una aplicacion web para una discoteca tematica de jazz y live sessions. Su objetivo es centralizar la experiencia del cliente y la operativa interna del local en una sola plataforma.
@@ -8492,6 +8529,56 @@ Reducir la apariencia generica del dashboard de usuario en `/app` sin cambiar ru
 ### Pendiente
 
 - Validar visualmente con sesion autenticada real en desktop amplio, tablet y movil.
+
+---
+
+## Fase 1.8 cartelera inferior Hoy en FLEX - 2026-06-25
+
+### Objetivo
+
+Convertir los rails inferiores de `/app/today` en una cartelera editorial responsive, sin tocar encabezado, filtros, spotlight, agenda, consultas, rutas, Supabase, mocks, RLS, migraciones ni Stripe.
+
+### Archivos modificados
+
+- `components/feed/FeedRail.tsx`
+- `components/feed/FeedPostCard.tsx`
+- `DOCUMENTACION_FLEX.md`
+
+### Cambios realizados
+
+- `FeedRail` deja de usar scroller horizontal, flechas, listeners de scroll y `tabIndex`.
+- Con una publicacion, la seccion usa una composicion ancha tipo fila editorial.
+- Ajuste de la variante `wide`: desde `lg` separa metadata, contenido flexible y accion final en tres zonas reales.
+- En `wide` se oculta el contador `1 publicacion` para reducir ruido.
+- En `wide` no se muestra imagen; se prioriza la lectura editorial, el titulo y el cierre de fila con CTA.
+- Con dos publicaciones, la seccion usa dos columnas desde `md` y una columna en movil.
+- Con tres o mas publicaciones, la seccion usa grid responsive: una columna en movil, dos en tablet y tres desde `xl`.
+- Se elimina el espacio vacio de cards estrechas aisladas.
+- `FeedPostCard` agrega variantes editoriales `wide` y `grid`.
+- Las cards reducen badges pesados, gradientes llamativos, sombras fuertes y alturas fijas.
+- El titulo pasa a ser el foco visual; metadata, prioridad y estado fijado quedan compactos.
+- El CTA se integra como enlace editorial con area tactil minima de 44 px.
+- Se conservan titulos, subtitulos, publicaciones, orden, categorias, prioridad, estado fijado, CTA seguro, enlaces internos y HTTPS.
+
+### Como probar
+
+1. Ejecutar `npm run dev`.
+2. Abrir `/app/today` con sesion autenticada.
+3. Confirmar que una seccion con una sola publicacion ocupa el ancho como fila editorial y no como card estrecha.
+4. Confirmar que secciones con dos publicaciones quedan en dos columnas desde tablet y una columna en movil.
+5. Confirmar que secciones con tres o mas publicaciones forman una grid sin scroll horizontal.
+6. Probar CTA y enlaces de eventos con teclado; no debe haber enlaces anidados ni controles desconectados.
+7. Revisar 1440 px, 1280 px, 1024 px, 768 px y 390 px: sin texto cortado, sin scroll horizontal y sin contenido tapado por navegacion movil.
+
+### Validaciones ejecutadas
+
+- `npm run lint`: OK.
+- `npm run build`: OK. Aviso no bloqueante de Next.js: `middleware` esta deprecado y debe migrarse a `proxy` en una fase aparte.
+- `git diff --check`: OK.
+
+### Pendiente
+
+- Validar visualmente con datos reales que cubran una, dos y tres o mas publicaciones por categoria.
 
 ---
 

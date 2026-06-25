@@ -116,6 +116,14 @@ export function getFeedPostImageUrl(post: Pick<FeedPostView, "image_url" | "even
   return post.image_url || post.events?.image_url || post.events?.cover_image_path || "";
 }
 
+function getFeedPostImageAlt(post: Pick<FeedPostView, "title" | "events">) {
+  const artistName = post.events?.artist_name?.trim();
+  if (artistName) return `${artistName} - ${post.title}`;
+  const eventTitle = post.events?.title?.trim();
+  if (eventTitle && eventTitle !== post.title) return `${eventTitle} - ${post.title}`;
+  return post.title;
+}
+
 function safeCtaUrl(value: string | null | undefined) {
   const trimmed = value?.trim();
   if (!trimmed) return "";
@@ -183,77 +191,133 @@ function bodyPreview(body: string | null, limit: number) {
   return value.length > limit ? `${value.slice(0, limit - 3)}...` : value;
 }
 
-export function FeedPostCard({ post, variant = "list", index = 0 }: { post: FeedPostView; variant?: "list" | "featured" | "standard" | "compact"; index?: number }) {
+export function FeedPostCard({ post, variant = "list", index = 0 }: { post: FeedPostView; variant?: "list" | "featured" | "standard" | "compact" | "wide" | "grid"; index?: number }) {
   const typeStyle = getTypeStyle(post.type);
   const Icon = typeStyle.Icon;
   const safeType = getSafeType(post.type);
   const priorityLabel = priorityLabels[post.priority] ?? priorityLabels.normal;
   const showPriority = post.priority === "urgent" || post.priority === "high";
   const visual = visualStyles[safeType] ?? visualStyles.announcement;
-  const imageUrl = getFeedPostImageUrl(post) || visual.imageUrl || "";
+  const postImageUrl = getFeedPostImageUrl(post);
+  const imageUrl = postImageUrl || visual.imageUrl || "";
   const cta = getFeedPostCta(post);
   const eventHref = safeType === "event" && post.event_id ? `/app/events/${post.event_id}` : null;
   const zoneLabel = post.club_zones?.name || post.events?.zone_name || "";
 
   if (variant !== "list") {
-    const featured = variant === "featured";
+    const wide = variant === "wide";
     const compact = variant === "compact";
-    const minHeight = featured ? "min-h-[390px] sm:min-h-[460px]" : compact ? "min-h-[205px]" : "min-h-[270px]";
-    const titleSize = featured ? "text-3xl sm:text-4xl" : compact ? "text-xl" : "text-2xl";
-    const bodyLimit = featured ? 156 : compact ? 90 : 118;
+    const titleSize = wide ? "text-2xl sm:text-3xl lg:text-[2rem]" : compact ? "text-xl" : "text-2xl";
+    const bodyLimit = wide ? 170 : compact ? 92 : 124;
+    const wideImageUrl = wide ? postImageUrl : "";
+    const wideWithImage = Boolean(wideImageUrl);
 
-    const cardClassName = `soft-enter group relative isolate block h-full overflow-hidden rounded-lg border border-white/10 bg-white/[0.028] shadow-[0_12px_30px_rgba(0,0,0,0.18)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-[var(--gold)]/26 hover:shadow-[0_18px_42px_rgba(0,0,0,0.24)] ${minHeight}`;
+    const cardClassName = `soft-enter group block h-full overflow-hidden rounded-lg border transition-[background-color,border-color,transform] duration-200 hover:-translate-y-0.5 ${
+      post.is_pinned
+        ? "border-[var(--gold)]/24 bg-[var(--gold)]/7 hover:border-[var(--gold)]/36"
+        : "border-white/10 bg-white/[0.026] hover:border-white/18 hover:bg-white/[0.04]"
+    }`;
     const cardContent = (
-      <>
-        <div className="absolute inset-0 overflow-hidden">
-          <div className={`absolute inset-0 bg-gradient-to-br ${visual.visual} transition-transform duration-500 group-hover:scale-[1.015]`} />
-          {imageUrl ? (
-            <div
-              className="absolute inset-0 bg-cover bg-center opacity-82 transition-transform duration-500 group-hover:scale-[1.025]"
-              style={{ backgroundImage: `url(${imageUrl})` }}
+      <div className={wideWithImage ? "grid overflow-hidden xl:grid-cols-[minmax(0,0.38fr)_minmax(0,1fr)]" : wide ? "grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(8rem,0.28fr)_minmax(0,1fr)_auto] lg:items-center lg:gap-6" : "flex h-full flex-col p-4 sm:p-5"}>
+        {wideWithImage ? (
+          <div className="relative min-h-48 overflow-hidden border-b border-white/10 bg-black/30 sm:min-h-56 xl:min-h-full xl:border-b-0 xl:border-r">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={wideImageUrl}
+              alt={getFeedPostImageAlt(post)}
+              className="h-full min-h-48 w-full object-cover object-center sm:min-h-56 xl:min-h-full"
             />
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.04),rgba(0,0,0,0.34))]" />
+          </div>
+        ) : null}
+
+        <div className={wideWithImage ? "grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(7rem,0.24fr)_minmax(0,1fr)] xl:grid-cols-[minmax(7rem,0.22fr)_minmax(0,1fr)_auto] xl:items-center xl:gap-5" : "contents"}>
+        {imageUrl && !wide ? (
+          <div
+            className="mb-4 aspect-[16/9] rounded-md border border-white/10 bg-cover bg-center"
+            style={{ backgroundImage: `linear-gradient(180deg,rgba(0,0,0,0.05),rgba(0,0,0,0.48)), url(${imageUrl})` }}
+            aria-hidden="true"
+          />
+        ) : null}
+
+        {wide ? (
+          <div className="min-w-0 border-b border-white/10 pb-3 lg:border-b-0 lg:border-r lg:pb-0 lg:pr-5">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold uppercase tracking-[0.08em] text-white/48 lg:flex-col lg:items-start">
+              <span className="text-[var(--gold-bright)]">{typeStyle.label}</span>
+              {showPriority ? <span>{priorityLabel}</span> : null}
+              {post.is_pinned ? <span>Fijado</span> : null}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/50 lg:flex-col lg:gap-y-2">
+              <span className="inline-flex items-center gap-1.5">
+                <CalendarClock size={13} className="text-[var(--gold)]/80" />
+                {formatRange(post.starts_at, post.ends_at)}
+              </span>
+              {zoneLabel ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin size={13} className="text-[var(--gold)]/80" />
+                  {zoneLabel}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="min-w-0">
+          {!wide ? (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold uppercase tracking-[0.08em] text-white/48">
+              <span className="text-[var(--gold-bright)]">{typeStyle.label}</span>
+              {showPriority ? <span>{priorityLabel}</span> : null}
+              {post.is_pinned ? <span>Fijado</span> : null}
+            </div>
           ) : null}
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.08),rgba(0,0,0,0.32)_40%,rgba(0,0,0,0.86))]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_12%,rgba(217,166,64,0.14),transparent_15rem)]" />
-        </div>
 
-        <div className={`relative flex h-full min-h-[inherit] flex-col justify-end ${featured ? "p-5 sm:p-6" : "p-4 sm:p-5"}`}>
-          <div className="mb-auto flex items-center justify-between gap-3">
-            <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] backdrop-blur-sm ${typeStyle.className}`}>
-              <Icon size={13} />
-              {typeStyle.label}
+          {!wide ? (
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/50">
+              <span className="inline-flex items-center gap-1.5">
+                <CalendarClock size={13} className="text-[var(--gold)]/80" />
+                {formatRange(post.starts_at, post.ends_at)}
+              </span>
+              {zoneLabel ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin size={13} className="text-[var(--gold)]/80" />
+                  {zoneLabel}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+
+          <h2 className={`font-display ${wide ? "mt-0" : "mt-3"} max-w-3xl leading-none text-white [text-wrap:balance] ${titleSize}`}>{post.title}</h2>
+          {eventHref && !wide ? (
+            <span className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] text-xs font-bold uppercase tracking-[0.08em] text-[var(--gold-bright)] transition-colors group-hover:text-[var(--gold)]">
+              Ver evento
+              <ArrowRight size={14} />
             </span>
-            {post.is_pinned ? (
-              <span className="rounded-full border border-[var(--gold)]/22 bg-black/35 px-3 py-1 text-xs font-semibold text-[var(--gold-bright)] backdrop-blur-sm">
-                Fijado
-              </span>
-            ) : null}
-          </div>
-
-          <div>
-            <p className="text-sm font-semibold text-[var(--gold-bright)]">{zoneLabel || formatRange(post.starts_at, post.ends_at)}</p>
-            <h2 className={`mt-2 max-w-3xl font-bold leading-tight text-white ${titleSize}`}>{post.title}</h2>
-            {eventHref ? (
-              <span className="mt-4 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.08em] text-[var(--gold-bright)]">
-                Ver evento
-                <ArrowRight size={14} />
-              </span>
-            ) : (
-              <p className={`mt-3 max-w-2xl text-sm leading-6 text-white/74 ${compact ? "line-clamp-2" : ""}`}>{bodyPreview(post.body, bodyLimit)}</p>
-            )}
-            {cta && !eventHref ? (
-              <Link
-                href={cta.href}
-                prefetch={false}
-                className="gold-focus mt-5 inline-flex min-h-10 items-center gap-2 rounded-md bg-[var(--gold)] px-4 text-xs font-bold uppercase tracking-[0.08em] text-black transition-[background-color,transform] duration-200 hover:-translate-y-px hover:bg-[var(--gold-bright)]"
-              >
-                {cta.label}
-                <ArrowRight size={15} />
-              </Link>
-            ) : null}
-          </div>
+          ) : (
+            <p className={`mt-3 max-w-[62ch] text-sm leading-6 text-white/66 ${compact ? "line-clamp-2" : ""}`}>{bodyPreview(post.body, bodyLimit)}</p>
+          )}
         </div>
-      </>
+
+        {cta && !eventHref ? (
+          <Link
+            href={cta.href}
+            prefetch={false}
+            className={wide
+              ? "gold-focus inline-flex min-h-11 shrink-0 items-center gap-2 rounded-[var(--radius-control)] text-xs font-bold uppercase tracking-[0.08em] text-[var(--gold)] underline decoration-[var(--gold)]/30 underline-offset-4 transition-colors hover:text-[var(--gold-bright)] lg:self-center"
+              : "gold-focus mt-5 inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] text-xs font-bold uppercase tracking-[0.08em] text-[var(--gold)] underline decoration-[var(--gold)]/30 underline-offset-4 transition-colors hover:text-[var(--gold-bright)]"
+            }
+          >
+            {cta.label}
+            <ArrowRight size={14} />
+          </Link>
+        ) : null}
+        {wide && eventHref ? (
+          <span className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-[var(--radius-control)] text-xs font-bold uppercase tracking-[0.08em] text-[var(--gold)] underline decoration-[var(--gold)]/30 underline-offset-4 transition-colors group-hover:text-[var(--gold-bright)] lg:self-center">
+            Ver evento
+            <ArrowRight size={14} />
+          </span>
+        ) : null}
+        </div>
+      </div>
     );
 
     if (eventHref) {
