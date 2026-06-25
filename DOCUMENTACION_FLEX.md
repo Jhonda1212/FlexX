@@ -8495,6 +8495,49 @@ Reducir la apariencia generica del dashboard de usuario en `/app` sin cambiar ru
 
 ---
 
+## Fase 1.6 jerarquia responsive dashboard home - 2026-06-25
+
+### Objetivo
+
+Ajustar la jerarquia responsive de `/app` para que `Mi noche` y `VIP` funcionen como rail lateral desde `xl`, y en tablet/movil aparezcan temprano dentro del flujo, despues de accesos rapidos y antes de `Hoy en FLEX` y `Proximos eventos`.
+
+### Archivos modificados
+
+- `app/app/page.tsx`
+- `components/app/HomeNightStatus.tsx`
+- `DOCUMENTACION_FLEX.md`
+
+### Cambios realizados
+
+- El grid principal de `/app` pasa de dos columnas solo en `2xl` a dos columnas desde `xl`.
+- La columna lateral usa `minmax(320px,360px)` para conservar ancho util y evitar compresion de textos, enlaces y entrada.
+- `HomeNightStatus` queda en orden 2 en el flujo base, justo despues de carrusel y accesos rapidos.
+- `Hoy en FLEX` queda en orden 3 y `Proximos eventos` en orden 4 en tablet/movil.
+- Desde `xl`, `HomeNightStatus` ocupa la columna derecha desde la primera fila, mantiene `Mi noche` encima de `VIP` y conserva sticky solo para ese layout lateral.
+- No se duplican bloques ni se cambia contenido, rutas, datos, consultas, mocks, contratos o logica.
+
+### Como probar
+
+1. Ejecutar `npm run dev`.
+2. Abrir `/app` con sesion autenticada.
+3. Revisar 1440 px y 1280 px: rail derecho visible desde `xl`, ancho util, `Mi noche` sobre `VIP`, sin scroll horizontal.
+4. Revisar 1024 px, 768 px y 390 px: `Mi noche` y `VIP` aparecen despues de accesos rapidos y antes de `Hoy en FLEX` y `Proximos eventos`.
+5. Navegar con teclado y confirmar orden logico: carrusel, accesos rapidos, `Mi noche`, `VIP`, `Hoy en FLEX`, `Proximos eventos`.
+
+### Validaciones ejecutadas
+
+- `npm run lint`: OK.
+- `npm run build`: OK. Aviso no bloqueante de Next.js: `middleware` esta deprecado y debe migrarse a `proxy` en una fase aparte.
+- `git diff --check`: OK.
+- `git status --short`: solo muestra `DOCUMENTACION_FLEX.md`, `app/app/page.tsx` y `components/app/HomeNightStatus.tsx`.
+- `next-env.d.ts`: sin cambios.
+
+### Pendiente
+
+- Validar visualmente con sesion autenticada real en 1440 px, 1280 px, 1024 px, 768 px y 390 px. En esta fase, Chrome headless redirigio `/app` a `/login?redirectTo=%2Fapp` porque no habia sesion activa y `NEXT_PUBLIC_ENABLE_MOCKS` no estaba habilitado.
+
+---
+
 ## Fase 1.5 accesibilidad carrusel principal - 2026-06-24
 
 ### Objetivo

@@ -4,7 +4,7 @@ import { FlexCard } from "@/components/ui/FlexCard";
 
 export function HomeNightStatus() {
   return (
-    <aside className="content-auto order-3 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,250px),1fr))] gap-6 2xl:sticky 2xl:top-8 2xl:order-2 2xl:col-start-2 2xl:row-span-2 2xl:row-start-1 2xl:block 2xl:space-y-5 2xl:self-start">
+    <aside className="content-auto order-2 grid min-w-0 grid-cols-[repeat(auto-fit,minmax(min(100%,250px),1fr))] gap-6 xl:sticky xl:top-8 xl:col-start-2 xl:row-span-4 xl:row-start-1 xl:block xl:space-y-5 xl:self-start">
       <FlexCard className="paint-contain overflow-hidden p-0">
         <div className="border-b border-white/10 px-5 py-4">
           <h2 className="font-display text-3xl leading-none text-white">Mi noche</h2>
