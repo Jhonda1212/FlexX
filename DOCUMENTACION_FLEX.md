@@ -8495,6 +8495,54 @@ Reducir la apariencia generica del dashboard de usuario en `/app` sin cambiar ru
 
 ---
 
+## Fase 1.7 primera fase visual Hoy en FLEX - 2026-06-25
+
+### Objetivo
+
+Convertir la parte superior de `/app/today` en un programa editorial compacto y operativo, sin cambiar consultas, Supabase, mocks, rutas, RLS, migraciones, Stripe ni los rails inferiores.
+
+### Archivos modificados
+
+- `app/app/today/page.tsx`
+- `components/feed/TodaySpotlight.tsx`
+- `DOCUMENTACION_FLEX.md`
+
+### Cambios realizados
+
+- Se elimino el `h1` local duplicado de `Hoy en FLEX`; se conserva el titulo global del shell.
+- La introduccion local queda como texto editorial compacto y etiqueta `Mural oficial`.
+- Los filtros mantienen los mismos valores internos y comportamiento, pero pasan a un selector compacto con `aria-pressed`, area tactil minima de 44 px e icono solo en la opcion activa.
+- `TodaySpotlight` deja de usar `min-h-[440px]` y baja a un modulo compacto con `min-h-[260px]` y crecimiento natural.
+- Spotlight y agenda rapida se integran en un unico modulo visual.
+- El split spotlight/agenda aparece solo desde `xl`; en `lg`, tablet y movil la agenda cae debajo del spotlight.
+- La agenda elimina botones `Ver` repetidos; cada fila completa sigue siendo enlace cuando existe ruta valida.
+- Se conservan titulo, tipo, prioridad, descripcion, CTA seguro, fecha, hora, zona y estado.
+- Se exporta `getTodaySpotlightPostId()` y se excluye de los grupos inferiores solo el post seleccionado como spotlight, usando su `id`.
+- Si al excluir el spotlight una categoria queda vacia, `postsByCategory()` no renderiza esa seccion.
+
+### Como probar
+
+1. Ejecutar `npm run dev`.
+2. Abrir `/app/today` con sesion autenticada.
+3. Confirmar que solo aparece un titulo principal `Hoy en FLEX`, el del shell.
+4. Probar filtros `Todos`, `Promos`, `Eventos`, `Actividades`, `VIP`, `Escenario` y `Avisos`; deben conservar comportamiento y foco visible.
+5. Probar CTA del spotlight y filas de agenda; deben navegar a las rutas existentes.
+6. Revisar 1440 px y 1280 px: spotlight y agenda en dos columnas.
+7. Revisar 1024 px, 768 px y 390 px: agenda debajo, filtros usables y sin scroll horizontal global.
+8. Confirmar que el post usado como spotlight no aparece duplicado en los rails inferiores de `Todos`.
+
+### Validaciones ejecutadas
+
+- `npm run lint`: OK.
+- `npm run build`: OK. Aviso no bloqueante de Next.js: `middleware` esta deprecado y debe migrarse a `proxy` en una fase aparte.
+- `git diff --check`: OK.
+
+### Pendiente
+
+- Validar visualmente con sesion autenticada real en 1440 px, 1280 px, 1024 px, 768 px y 390 px.
+
+---
+
 ## Fase 1.6 jerarquia responsive dashboard home - 2026-06-25
 
 ### Objetivo

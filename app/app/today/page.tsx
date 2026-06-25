@@ -6,7 +6,7 @@ import { Crown, Megaphone, Mic2, Music2, Radio, Sparkles, Ticket, Zap } from "lu
 import { AppEmptyState } from "@/components/app/AppEmptyState";
 import { Card } from "@/components/ui/Card";
 import { FeedRail } from "@/components/feed/FeedRail";
-import { TodaySpotlight, type TodayEventPreview } from "@/components/feed/TodaySpotlight";
+import { getTodaySpotlightPostId, TodaySpotlight, type TodayEventPreview } from "@/components/feed/TodaySpotlight";
 import type { FeedPostView } from "@/components/feed/FeedPostCard";
 import { createBrowserSupabase } from "@/lib/supabase";
 
@@ -217,42 +217,46 @@ export default function TodayPage() {
     };
   }, []);
 
-  const sections = useMemo(() => postsByCategory(posts), [posts]);
+  const spotlightPostId = useMemo(() => getTodaySpotlightPostId(posts, events), [posts, events]);
+  const sectionPosts = useMemo(
+    () => spotlightPostId ? posts.filter((post) => post.id !== spotlightPostId) : posts,
+    [posts, spotlightPostId]
+  );
+  const sections = useMemo(() => postsByCategory(sectionPosts), [sectionPosts]);
   const filteredPosts = useMemo(() => {
     if (filter === "all") return posts;
     return posts.filter((post) => safeCategory(post.type) === filter);
   }, [filter, posts]);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-7 overflow-hidden">
-      <header className="space-y-3 px-1">
-        <span className="inline-flex rounded-full border border-[var(--gold)]/18 bg-[var(--gold)]/7 px-3 py-1 text-xs font-semibold text-[var(--gold-bright)]">
+    <div className="mx-auto max-w-6xl space-y-5 overflow-hidden">
+      <header className="flex flex-col gap-2 px-1 sm:flex-row sm:items-end sm:justify-between">
+        <p className="max-w-2xl text-sm leading-6 text-white/66">
+          Programa oficial de la noche: promos, eventos y avisos importantes publicados por el equipo FLEX.
+        </p>
+        <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--gold)]">
           Mural oficial
         </span>
-        <div className="max-w-3xl">
-          <h1 className="font-display text-5xl leading-none text-white sm:text-6xl">Hoy en FLEX</h1>
-          <p className="mt-3 text-base leading-7 text-white/68">
-            Promos, eventos y avisos importantes de la noche, organizados por el equipo FLEX.
-          </p>
-        </div>
       </header>
 
-      <nav className="-mx-4 overflow-x-auto px-4 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden">
-        <div className="flex min-w-max gap-2 lg:min-w-0 lg:flex-wrap">
+      <nav className="-mx-4 overflow-x-auto px-4 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden" aria-label="Categorias de Hoy en FLEX">
+        <div className="inline-flex min-w-max overflow-hidden rounded-lg border border-white/10 bg-white/[0.025] p-1 lg:min-w-0 lg:flex-wrap">
           {filters.map((item) => {
             const Icon = item.Icon;
             const active = filter === item.value;
             return (
               <button
                 key={item.value}
-                className={`gold-focus inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3.5 text-xs font-semibold transition-[background-color,border-color,color,transform] duration-200 active:scale-[0.98] ${
+                type="button"
+                aria-pressed={active}
+                className={`gold-focus inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-md border px-3.5 text-xs font-bold transition-[background-color,border-color,color,transform] duration-200 active:scale-[0.98] ${
                   active
-                    ? "border-[var(--gold)]/60 bg-[var(--gold)] text-black"
-                    : "border-white/10 bg-white/[0.025] text-white/66 hover:border-[var(--gold)]/30 hover:bg-[var(--gold)]/7 hover:text-white"
+                    ? "border-[var(--gold)]/45 bg-[var(--gold)] text-black shadow-[inset_0_-2px_0_rgba(0,0,0,0.22)]"
+                    : "border-transparent text-white/62 hover:bg-white/[0.045] hover:text-white"
                 }`}
                 onClick={() => setFilter(item.value)}
               >
-                <Icon size={14} />
+                {active ? <Icon size={14} /> : null}
                 {item.label}
               </button>
             );

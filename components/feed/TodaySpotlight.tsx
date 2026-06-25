@@ -29,6 +29,13 @@ const fallbackVisualByType: Record<string, string> = {
   stage: "from-red-400/18 via-[var(--gold)]/8 to-black"
 };
 
+const priorityLabels: Record<string, string> = {
+  urgent: "Urgente",
+  high: "Alta prioridad",
+  normal: "Prioridad normal",
+  low: "Baja prioridad"
+};
+
 function postRankTime(post: FeedPostView) {
   const createdAt = post.created_at ? new Date(post.created_at).getTime() : 0;
   const startsAt = post.starts_at ? new Date(post.starts_at).getTime() : 0;
@@ -55,6 +62,11 @@ function pickSpotlight(posts: FeedPostView[], events: TodayEventPreview[]): Spot
   return null;
 }
 
+export function getTodaySpotlightPostId(posts: FeedPostView[], events: TodayEventPreview[]) {
+  const selection = pickSpotlight(posts, events);
+  return selection?.kind === "post" ? selection.post.id : null;
+}
+
 function dayLabel(value: string) {
   const date = new Date(value);
   const today = new Date();
@@ -68,21 +80,22 @@ function hourLabel(value: string) {
 }
 
 function bodyPreview(body: string | null) {
-  const fallback = "Selección oficial del equipo FLEX para orientar la noche.";
+  const fallback = "Seleccion oficial del equipo FLEX para orientar la noche.";
   const value = body?.trim() || fallback;
-  return value.length > 168 ? `${value.slice(0, 165)}...` : value;
+  return value.length > 152 ? `${value.slice(0, 149)}...` : value;
 }
 
 function selectionMeta(selection: SpotlightSelection) {
   if (selection.kind === "event") {
     return {
-      label: "Evento próximo",
+      label: "Evento proximo",
       title: selection.event.title,
-      body: selection.event.zone_name ? `${selection.event.zone_name} · ${dayLabel(selection.event.starts_at)} ${hourLabel(selection.event.starts_at)}` : `${dayLabel(selection.event.starts_at)} ${hourLabel(selection.event.starts_at)}`,
+      body: selection.event.zone_name ? `${selection.event.zone_name} - ${dayLabel(selection.event.starts_at)} ${hourLabel(selection.event.starts_at)}` : `${dayLabel(selection.event.starts_at)} ${hourLabel(selection.event.starts_at)}`,
       imageUrl: selection.event.image_url || selection.event.cover_image_path || "/images/events/john-coltrane.jpg",
       visual: fallbackVisualByType.event,
       cta: { label: "Ver evento", href: `/app/events/${selection.event.id}` },
-      Icon: Music2
+      Icon: Music2,
+      priorityLabel: null
     };
   }
 
@@ -99,7 +112,8 @@ function selectionMeta(selection: SpotlightSelection) {
     imageUrl,
     visual: fallbackVisualByType[type] ?? fallbackVisualByType.announcement,
     cta,
-    Icon
+    Icon,
+    priorityLabel: priorityLabels[post.priority] ?? priorityLabels.normal
   };
 }
 
@@ -109,11 +123,12 @@ function eventStatus(event: TodayEventPreview) {
   const sameDay = date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate();
   if (event.featured) return "Destacado";
   if (sameDay) return "Hoy";
-  return "Próximo";
+  return "Proximo";
 }
 
-function quickFallbackPosts(posts: FeedPostView[]) {
+function quickFallbackPosts(posts: FeedPostView[], excludePostId: string | null) {
   return posts
+    .filter((post) => post.id !== excludePostId)
     .filter((post) => post.type === "promotion" || post.type === "vip" || post.type === "stage")
     .filter((post) => getFeedPostCta(post))
     .slice(0, 3);
@@ -125,44 +140,44 @@ export function TodaySpotlight({ posts, events }: { posts: FeedPostView[]; event
 
   const meta = selectionMeta(selection);
   const agendaEvents = events.filter((event) => event.id !== selection.linkedEventId).slice(0, 3);
-  const fallbackPosts = agendaEvents.length > 0 ? [] : quickFallbackPosts(posts);
+  const selectedPostId = selection.kind === "post" ? selection.post.id : null;
+  const fallbackPosts = agendaEvents.length > 0 ? [] : quickFallbackPosts(posts, selectedPostId);
   const Icon = meta.Icon;
 
   return (
-    <section className="soft-enter grid gap-4 lg:grid-cols-[minmax(0,2.05fr)_minmax(300px,0.95fr)]">
-      <article className="group relative isolate min-h-[440px] overflow-hidden rounded-lg border border-white/10 bg-white/[0.03] shadow-[0_18px_50px_rgba(0,0,0,0.24)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-[var(--gold)]/28 hover:shadow-[0_24px_58px_rgba(0,0,0,0.30)]">
+    <section className="soft-enter grid overflow-hidden rounded-lg border border-white/10 bg-white/[0.026] shadow-[0_18px_46px_rgba(0,0,0,0.24)] xl:grid-cols-[minmax(0,1fr)_340px]">
+      <article className="group relative isolate min-h-[260px] overflow-hidden border-b border-white/10 transition-colors duration-300 hover:border-[var(--gold)]/28 sm:min-h-[292px] xl:border-b-0 xl:border-r">
         <div className="absolute inset-0 overflow-hidden">
           <div className={`absolute inset-0 bg-gradient-to-br ${meta.visual}`} />
           {meta.imageUrl ? (
             <div
-              className="absolute inset-0 bg-cover bg-center opacity-86 transition-transform duration-500 group-hover:scale-[1.018]"
+              className="absolute inset-0 bg-cover bg-center opacity-72 transition-transform duration-500 group-hover:scale-[1.012]"
               style={{ backgroundImage: `url(${meta.imageUrl})` }}
             />
           ) : null}
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.08),rgba(0,0,0,0.30)_34%,rgba(0,0,0,0.88))]" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(240,194,100,0.16),transparent_16rem)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.88),rgba(0,0,0,0.62)_48%,rgba(0,0,0,0.30))]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(240,194,100,0.12),transparent_13rem)]" />
         </div>
 
-        <div className="relative flex min-h-[440px] flex-col justify-end p-5 sm:p-7">
-          <div className="mb-auto flex items-center justify-between gap-3">
-            <span className="inline-flex items-center gap-2 rounded-full border border-[var(--gold)]/24 bg-black/35 px-3 py-1 text-xs font-bold uppercase tracking-[0.08em] text-[var(--gold-bright)] backdrop-blur-sm">
+        <div className="relative flex min-h-[260px] flex-col justify-between p-5 sm:min-h-[292px] sm:p-6">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-2 border-b border-[var(--gold)]/36 pb-1 text-xs font-bold uppercase tracking-[0.12em] text-[var(--gold-bright)]">
               <Icon size={14} />
-              Spotlight de la noche
+              Programa destacado
             </span>
-            <span className="hidden rounded-full border border-white/10 bg-white/[0.045] px-3 py-1 text-xs font-semibold text-white/70 backdrop-blur-sm sm:inline">
-              {meta.label}
-            </span>
+            <span className="text-xs font-semibold text-white/62">{meta.label}</span>
+            {meta.priorityLabel ? <span className="text-xs font-semibold text-white/44">{meta.priorityLabel}</span> : null}
           </div>
 
-          <div className="max-w-2xl">
+          <div className="max-w-2xl pt-6">
             <p className="text-sm font-semibold text-[var(--gold-bright)]">{selection.kind === "post" ? feedTimeLabel(selection.post) : "Agenda FLEX"}</p>
-            <h2 className="mt-3 text-4xl font-bold leading-none text-white sm:text-5xl">{meta.title}</h2>
-            <p className="mt-4 max-w-xl text-sm leading-6 text-white/74 sm:text-base sm:leading-7">{meta.body}</p>
+            <h2 className="font-display mt-2 text-3xl leading-none text-white [text-wrap:balance] sm:text-4xl">{meta.title}</h2>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-white/74">{meta.body}</p>
             {meta.cta ? (
               <Link
                 href={meta.cta.href}
                 prefetch={false}
-                className="gold-focus mt-6 inline-flex min-h-11 items-center gap-2 rounded-md bg-[var(--gold)] px-5 text-xs font-bold uppercase tracking-[0.08em] text-black transition-[background-color,transform] duration-200 hover:-translate-y-px hover:bg-[var(--gold-bright)]"
+                className="gold-focus mt-5 inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] bg-[var(--gold)] px-4 text-xs font-bold uppercase tracking-[0.08em] text-black transition-[background-color,transform] duration-200 hover:-translate-y-px hover:bg-[var(--gold-bright)]"
               >
                 {meta.cta.label}
                 <ArrowRight size={16} />
@@ -172,23 +187,23 @@ export function TodaySpotlight({ posts, events }: { posts: FeedPostView[]; event
         </div>
       </article>
 
-      <aside className="self-start rounded-lg border border-white/10 bg-white/[0.026] p-3 sm:p-4">
-        <div className="flex items-center justify-between gap-3">
+      <aside className="self-stretch p-4 sm:p-5">
+        <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--gold)]">Agenda rápida</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--gold)]">Agenda rapida</p>
             <h3 className="mt-1 text-lg font-bold text-white">Esta noche</h3>
           </div>
           <CalendarClock size={18} className="text-[var(--gold)]" />
         </div>
 
         {agendaEvents.length > 0 ? (
-          <div className="mt-3 divide-y divide-white/10">
+          <div className="divide-y divide-white/10">
             {agendaEvents.map((event) => (
               <Link
                 key={event.id}
                 href={`/app/events/${event.id}`}
                 prefetch={false}
-                className="gold-focus group grid grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-3 py-3 transition-[background-color,transform] duration-200 hover:-translate-y-0.5"
+                className="gold-focus group grid min-h-16 grid-cols-[3.75rem_minmax(0,1fr)] items-center gap-3 py-3 transition-[background-color,color,transform] duration-200 hover:-translate-y-0.5"
               >
                 <div className="rounded-md border border-[var(--gold)]/16 bg-[var(--gold)]/7 px-2 py-1.5 text-center">
                   <div className="text-xs font-bold uppercase text-[var(--gold-bright)]">{dayLabel(event.starts_at)}</div>
@@ -201,14 +216,11 @@ export function TodaySpotlight({ posts, events }: { posts: FeedPostView[]; event
                     <span>{eventStatus(event)}</span>
                   </div>
                 </div>
-                <span className="rounded-full border border-white/10 px-2.5 py-1 text-xs font-bold text-white/70 transition group-hover:border-[var(--gold)]/30 group-hover:text-[var(--gold-bright)]">
-                  Ver
-                </span>
               </Link>
             ))}
           </div>
         ) : fallbackPosts.length > 0 ? (
-          <div className="mt-3 divide-y divide-white/10">
+          <div className="divide-y divide-white/10">
             {fallbackPosts.map((post) => {
               const cta = getFeedPostCta(post);
               if (!cta) return null;
@@ -217,23 +229,21 @@ export function TodaySpotlight({ posts, events }: { posts: FeedPostView[]; event
                   key={post.id}
                   href={cta.href}
                   prefetch={false}
-                  className="gold-focus group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 py-3 transition-[color,transform] duration-200 hover:-translate-y-0.5"
+                  className="gold-focus group grid min-h-16 grid-cols-[minmax(0,1fr)] items-center gap-3 py-3 transition-[color,transform] duration-200 hover:-translate-y-0.5"
                 >
                   <div className="min-w-0">
                     <div className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--gold)]">{feedTypeLabel(post.type)}</div>
                     <div className="mt-1 truncate text-sm font-bold text-white">{post.title}</div>
+                    <div className="mt-1 text-xs font-semibold text-white/48">{cta.label}</div>
                   </div>
-                  <span className="rounded-full border border-white/10 px-2.5 py-1 text-xs font-bold text-white/70 transition group-hover:border-[var(--gold)]/30 group-hover:text-[var(--gold-bright)]">
-                    {cta.label}
-                  </span>
                 </Link>
               );
             })}
           </div>
         ) : (
-          <div className="mt-3 rounded-md border border-white/10 bg-black/24 p-3">
-            <p className="font-bold text-white">La agenda se está preparando.</p>
-            <p className="mt-1.5 text-sm leading-6 text-white/56">Cuando haya eventos o acciones destacadas, aparecerán aquí.</p>
+          <div className="mt-4 rounded-md border border-white/10 bg-black/24 p-3">
+            <p className="font-bold text-white">La agenda se esta preparando.</p>
+            <p className="mt-1.5 text-sm leading-6 text-white/56">Cuando haya eventos o acciones destacadas, apareceran aqui.</p>
           </div>
         )}
       </aside>
